@@ -116,7 +116,7 @@ html[data-mode="pc"] .equip button{font-size:9px;padding:5px 4px}
 .item.selected{outline:2px solid #c39a52;background:#1a1810}
 .item .qty{position:absolute;right:4px;top:4px;font:800 10px monospace;color:#c39a52}
 .item{position:relative}.item.empty-slot{opacity:.55;border-style:dashed;cursor:default}
-.doc{padding:12px;background:#111617;border:1px solid #2c3437;border-radius:8px;margin-bottom:8px}.doc h3{font:800 13px monospace;margin:0 0 7px}.doc p{margin:0;color:#a8aeac;font:12px/1.55 Georgia,serif;white-space:pre-line}.doc .meta{font:9px monospace;color:#687173;margin-top:8px}
+.docs-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;padding:11px 12px;background:linear-gradient(135deg,#111719,#0b0f10);border:1px solid #2d3639;border-radius:9px}.docs-toolbar .docs-count{font:10px monospace;color:#7f898b;letter-spacing:.08em}.docs-toolbar .docs-count b{color:#c39a52;font-size:13px}.docs-list{display:grid;gap:9px}.doc-card{position:relative;display:grid;grid-template-columns:42px 1fr auto;align-items:center;gap:11px;padding:12px;background:linear-gradient(135deg,#111719,#0d1213);border:1px solid #2c3437;border-radius:9px;transition:.16s}.doc-card:hover{border-color:#596367;background:#141a1c;transform:translateY(-1px)}.doc-icon{width:42px;height:48px;display:grid;place-items:center;background:#171d1f;border:1px solid #394245;border-radius:7px;color:#c39a52;font-size:20px}.doc-card h3{font:800 12px monospace;margin:0 0 5px;color:#e1dfd7}.doc-card .doc-meta{font:9px monospace;color:#687173;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.doc-card .doc-type{display:inline-block;margin-left:6px;padding:2px 5px;border:1px solid #394245;border-radius:3px;color:#8c9698}.doc-card .doc-preview{margin:6px 0 0;color:#8d9697;font:11px/1.45 Georgia,serif;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.doc-read{min-width:62px}.doc-viewer{background:linear-gradient(135deg,#111719,#0b0f10);border:1px solid #343d40;border-radius:9px;padding:17px}.doc-viewer-head{display:flex;gap:11px;align-items:flex-start;padding-bottom:12px;margin-bottom:13px;border-bottom:1px solid #293134}.doc-viewer-icon{width:42px;height:48px;flex:0 0 42px;display:grid;place-items:center;background:#171d1f;border:1px solid #424b4d;border-radius:7px;color:#c39a52;font-size:20px}.doc-viewer h3{font:800 16px/1.25 Georgia,serif;margin:0 0 6px}.doc-viewer .meta{font:9px monospace;color:#687173}.doc-viewer-body{margin:0;color:#c3c2b9;font:13px/1.75 Georgia,serif;white-space:pre-line}.doc-footnote{margin-top:13px;padding-top:10px;border-top:1px dashed #2b3335;color:#687173;font:9px/1.5 monospace}.doc{padding:12px;background:#111617;border:1px solid #2c3437;border-radius:8px;margin-bottom:8px}.doc h3{font:800 13px monospace;margin:0 0 7px}.doc p{margin:0;color:#a8aeac;font:12px/1.55 Georgia,serif;white-space:pre-line}.doc .meta{font:9px monospace;color:#687173;margin-top:8px}
 .inventory-note{font:10px monospace;color:#6d7678;margin-top:10px}.equip{display:grid;grid-template-columns:1fr 1fr;gap:7px}.equip button{text-align:left}
 
 .combat{display:grid;grid-template-columns:1.1fr .9fr;gap:12px}.combat-card{padding:15px;background:#0e1314;border:1px solid #2b3336;border-radius:9px}.combat-portrait{height:160px;background:radial-gradient(circle at 50% 45%,#60686522,#070909 65%);display:grid;place-items:center;font:900 52px monospace;color:#7d8787;border:1px solid #252c2e;border-radius:7px;margin-bottom:12px}.threat{font:900 13px monospace}.threatbar{height:9px;background:#1d2426;border-radius:99px;overflow:hidden;margin:8px 0 12px}.threatbar i{display:block;height:100%;background:#a83232;transition:.2s}.aim-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.aim{padding:11px 4px;background:#151a1c;border:1px solid #30383b;border-radius:7px;cursor:pointer;font:11px monospace}.aim:hover{border-color:#b64a4a}.combat-actions{display:grid;gap:7px}.combat-actions .btn{text-align:left}.combat-log{height:170px;overflow:auto;background:#080b0c;border:1px solid #22292c;border-radius:7px;padding:9px;font:10px/1.55 monospace;color:#879092;margin-top:10px}.combat-log div{margin-bottom:5px}.red{color:#d76560}.green{color:#82aa84}.amber{color:#c5a362}
@@ -131,6 +131,7 @@ kbd{border:1px solid #3b4447;border-bottom-width:2px;background:#161b1d;border-r
  .map{height:min(420px,55vh)}
 }
 @media(max-width:600px){
+ .doc-card{grid-template-columns:38px 1fr}.doc-icon{width:38px;height:44px}.doc-read{grid-column:2;width:100%}.docs-toolbar{align-items:flex-start}.doc-viewer-body{font-size:12.5px}
  .main{padding:8px 6px 72px}.topbar{padding:7px 8px}.brand-copy{font-size:10px}.status .pill:nth-child(2){display:none}
  .hero{min-height:calc(100vh - 90px)}.logo{font-size:42px}.choice-grid{grid-template-columns:1fr}.choice-card{min-height:160px}.choice-card .portrait{height:80px}
  .scene-art{height:120px}.scene-body{padding:12px}.scene-title{font-size:18px}.narrative{font-size:13.5px;line-height:1.6}
@@ -603,6 +604,7 @@ function baseState(char,diff){
   inventory:inv,
   inventoryMax:8,stash:[],
   ammo,
+  // Documents are a separate permanent archive: they never consume inventory or stash slots.
   docs:[],visited:[],flags:{flashCharges: char==="mara" ? 3 : 0},decisions:[],
   weapons,
   saves: needsInk ? 2 : 99,
@@ -3576,6 +3578,14 @@ function startGame(char,diff,forceNew=false){
  // Cap stacks
  const CAPS={ammo9:60,shells:20,ammoSmg:200};
  for(const id of Object.keys(CAPS)) S.ammo[id]=Math.min(CAPS[id],S.ammo[id]||0);
+ // Documents are archive records, never inventory/stash items. Migrate any legacy save safely.
+ if(!Array.isArray(S.docs)) S.docs=[];
+ const misplacedDocs=[...(S.inventory||[]),...(S.stash||[])].filter(id=>DOCS[id]);
+ if(misplacedDocs.length){
+  misplacedDocs.forEach(id=>{if(!S.docs.includes(id))S.docs.push(id)});
+  S.inventory=(S.inventory||[]).filter(id=>!DOCS[id]);
+  S.stash=(S.stash||[]).filter(id=>!DOCS[id]);
+ }
   stripInkIfNeeded();
  recomputeInventoryMax();
  // Sync map for current scene
@@ -3758,7 +3768,10 @@ function stripInkIfNeeded(){
  S.saves=99;
 }
 function addDoc(id){
- if(id && DOCS[id] && !S.docs.includes(id)){S.docs.push(id);toast(`Documento: ${DOCS[id].title}`)}
+ if(id && DOCS[id] && !S.docs.includes(id)){
+  S.docs.push(id);
+  toast(`Documento archivado: ${DOCS[id].title}`);
+ }
 }
 function applyEffects(effects){
  if(!effects)return;
@@ -4060,16 +4073,89 @@ function buildSlotList(){
  S.invOrder = entries.map(e=>({kind:e.kind,id:e.id}));
  return entries;
 }
+function isCurrentSafe(){
+ const sc=SCENES[S.scene]||CHAR_SCENES[S.char]?.[S.scene];
+ return !!(sc?.safe || ["safe_shop","safe_station","safe_hospital","safe_water"].includes(S.scene));
+}
+function storeFromInventory(id,index){
+ if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return}
+ const it=ITEMS[id];
+ if(!it)return;
+ if(it.type==="ammo"){
+  const qty=ammoCount(id);
+  if(qty<=0){toast("No tienes esa munición");return}
+  S.stash=S.stash||[];
+  for(let n=0;n<qty;n++)S.stash.push(id);
+  S.ammo[id]=0;
+  toast(`Baúl: guardada toda la munición de ${it.name}`);
+ }else{
+  const i=S.inventory.indexOf(id,index>=0?index:0);
+  if(i<0){toast("Objeto no encontrado");return}
+  if(id==="pouch"){
+   const newCount=(S.inventory||[]).filter(x=>x!=="pouch").length;
+   const newMax=8+Math.min(2,newCount)*2;
+   if(newCount>newMax){toast("No puedes guardar esa riñonera: te dejaría el inventario lleno");uiSound("error");return}
+  }
+  S.inventory.splice(i,1);
+  if(S.flags.equipped===id)S.flags.equipped=null;
+  recomputeInventoryMax();
+  toast(`Baúl: ${it.name} guardado`);
+ }
+ persist();
+ document.querySelector(".modal-backdrop")?.remove();
+ openInventory(false);
+}
+function takeFromStash(id,index){
+ if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return}
+ const it=ITEMS[id];
+ if(!it)return;
+ S.stash=S.stash||[];
+ const i=index>=0?index:S.stash.indexOf(id);
+ if(i<0){toast("Objeto no encontrado en el baúl");return}
+ if(it.type==="ammo"){
+  const cur=ammoCount(id), max=it.stack||60;
+  if(cur>=max){toast(`${it.name}: al máximo (${max})`);uiSound("error");return}
+  if(cur===0 && slotCount()>=S.inventoryMax){toast("Inventario lleno");uiSound("error");return}
+  S.ammo[id]=cur+1;
+  S.stash.splice(i,1);
+  toast(`Sacado del baúl: ${it.name} (${S.ammo[id]}/${max})`);
+ }else{
+  if(slotCount()>=S.inventoryMax){toast("Inventario lleno");uiSound("error");return}
+  S.stash.splice(i,1);
+  S.inventory.push(id);
+  if(id==="pouch")recomputeInventoryMax();
+  toast(`Sacado del baúl: ${it.name}`);
+ }
+ persist();
+ document.querySelector(".modal-backdrop")?.remove();
+ openInventory(true);
+}
+function takeAllFromStash(){
+ if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return}
+ let moved=0;
+ const snapshot=[...(S.stash||[])];
+ for(const id of snapshot){
+  const before=S.stash.length;
+  takeFromStash(id,S.stash.indexOf(id));
+  if(S.stash.length<before)moved++;
+ }
+ toast(moved?`Sacados ${moved} objetos del baúl`:`No hay espacio para sacar más objetos`);
+}
 function openInventory(stash=false){
  _combineSel=null;
  window.__combineMode=false;
  window.__reorderMode=false;
  recomputeInventoryMax();
  if(stash){
+  if(!isCurrentSafe()){toast("El baúl solo está disponible en zonas seguras");return}
   const arr=S.stash||[];
+  const counts={};
+  for(const id of arr)counts[id]=(counts[id]||0)+1;
+  const grouped=Object.entries(counts);
   const body=`<div class="tabs"><button class="tab" onclick="this.closest('.modal-backdrop').remove();openInventory(false)">INVENTARIO (${slotCount()}/${S.inventoryMax})</button><button class="tab active">BAÚL (${arr.length})</button></div>
-  <div class="item-grid">${arr.length?arr.map((id,i)=>`<div class="item" onclick="itemAction('${id}',${i},true)"><div class="ico">${ITEMS[id]?.ico||"?"}</div><b>${esc(ITEMS[id]?.name||id)}</b><small>Mover al inventario</small></div>`).join(""):`<div class="empty" style="grid-column:1/-1">Baúl vacío</div>`}</div>
-  <p class="inventory-note">El baúl no tiene límite. Solo accesible en zonas seguras.</p>`;
+  <div class="item-grid">${grouped.length?grouped.map(([id,qty])=>{const it=ITEMS[id]||{};const idx=arr.indexOf(id);return `<div class="item"><div class="ico">${it.ico||"?"}</div><b>${esc(it.name||id)}</b><span class="qty">×${qty}</span><small>Baúl · guardar para después</small><div class="slot-actions"><button type="button" onclick="takeFromStash('${id}',${idx})">Sacar 1</button>${qty>1?`<button type="button" onclick="for(let n=0;n<${qty};n++){if(!S.stash.includes('${id}'))break;takeFromStash('${id}',S.stash.indexOf('${id}'));}">Sacar todo</button>`:""}</div></div>`}).join(""):`<div class="empty" style="grid-column:1/-1">Baúl vacío</div>`}</div>
+  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn small" onclick="this.closest('.modal-backdrop').remove();openInventory(false)">▣ Guardar objetos</button><button class="btn small ghost" onclick="document.querySelector('.modal-backdrop')?.remove()">Cerrar</button></div>
+  <p class="inventory-note">El baúl no tiene límite y conserva los objetos entre sesiones. Solo accesible en zonas seguras.</p>`;
   openModal("BAÚL",body,"inv-modal");
   return;
  }
@@ -4086,7 +4172,7 @@ function openInventory(stash=false){
   if(s.kind==="ammo"){
    const it=ITEMS[s.id];
    cells+=`<div class="item"><div class="ico">${it.ico}</div><b>${esc(it.name)}</b><span class="qty">×${s.qty}</span><small>Máx ${it.stack}</small>
-    <div class="slot-actions"><button type="button" onclick="event.stopPropagation();toast('${esc(it.name)}: se gasta al disparar')">Info</button></div>${moveBtns}</div>`;
+    <div class="slot-actions"><button type="button" onclick="event.stopPropagation();toast('${esc(it.name)}: se gasta al disparar')">Info</button>${isCurrentSafe()?`<button type="button" class="act-store" onclick="event.stopPropagation();storeFromInventory('${s.id}',-1)">▣ Guardar todo</button>`:""}</div>${moveBtns}</div>`;
   }else{
    const it=ITEMS[s.id]||{name:s.id,ico:"?"};
    const eq=(it.type==="weapon"&&S.flags.equipped===s.id)?` <span class="qty">E</span>`:"";
@@ -4102,6 +4188,10 @@ function openInventory(stash=false){
     actionBtns=`<div class="slot-actions"><button type="button" onclick="event.stopPropagation();useInvItem('${s.id}',${idx})">Info +2</button></div>`;
    }else{
     actionBtns=`<div class="slot-actions"><button type="button" onclick="event.stopPropagation();itemAction('${s.id}',${idx},false)">Info</button></div>`;
+   }
+   if(isCurrentSafe()){
+    const storeLabel=s.kind==="ammo"?"Guardar todo":"Guardar";
+    actionBtns += `<div class="slot-actions"><button type="button" class="act-store" onclick="event.stopPropagation();storeFromInventory('${s.id}',${idx})">▣ ${storeLabel}</button></div>`;
    }
    cells+=`<div class="item"><div class="ico">${it.ico||"?"}</div><b>${esc(it.name)}</b>${eq}<small>${it.type||""}</small>${actionBtns}${moveBtns}</div>`;
   }
@@ -4323,9 +4413,23 @@ function openMissions(){
  </div>`).join("")}</div>`:""}`;
  openModal("MISIONES",body,"inv-modal");
 }
+function openDocument(id){
+ const d=DOCS[id];
+ if(!d || !S.docs.includes(id)){toast("Documento no disponible");return}
+ const body=`<article class="doc-viewer">
+  <div class="doc-viewer-head"><div class="doc-viewer-icon">▤</div><div><h3>${esc(d.title)}</h3><div class="meta">${esc(d.meta||"ARCHIVO LOCAL")} · DOCUMENTO ARCHIVADO</div></div></div>
+  <p class="doc-viewer-body">${esc(d.body)}</p>
+  <div class="doc-footnote">Este documento pertenece al archivo de investigación de Raccoon Nightfall Files. Los documentos se almacenan automáticamente en ARCHIVO y no ocupan espacio del inventario ni del baúl.</div>
+ </article>
+ <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn ghost" onclick="document.querySelector('.modal-backdrop')?.remove();openDocs()">← Volver al archivo</button><button class="btn" onclick="document.querySelector('.modal-backdrop')?.remove()">Cerrar</button></div>`;
+ openModal("DOCUMENTO",body,"inv-modal");
+}
 function openDocs(){
- const body=S.docs.length?S.docs.map(id=>{const d=DOCS[id];return `<article class="doc"><h3>${esc(d.title)}</h3><p>${esc(d.body)}</p><div class="meta">${esc(d.meta)}</div></article>`}).join(""):`<div class="empty">Aún no has encontrado documentos.</div>`;
- openModal("DOCUMENTOS",body);
+ const docs=S.docs.filter(id=>DOCS[id]);
+ const body=docs.length?`<div class="docs-toolbar"><div><div class="eyebrow" style="margin:0 0 3px">ARCHIVO DE INVESTIGACIÓN</div><div class="docs-count"><b>${docs.length}</b> documento${docs.length===1?"":"s"} descubierto${docs.length===1?"":"s"}</div></div><div style="font-size:22px">▤</div></div>
+  <div class="docs-list">${docs.map((id,i)=>{const d=DOCS[id];const preview=(d.body||"").replace(/\s+/g," ").trim();return `<article class="doc-card"><div class="doc-icon">▤</div><div><h3>${esc(d.title)}</h3><div class="doc-meta">${esc(d.meta||"ARCHIVO LOCAL")}<span class="doc-type">REGISTRO ${String(i+1).padStart(2,"0")}</span></div><p class="doc-preview">${esc(preview)}</p></div><button class="btn small doc-read" onclick="openDocument('${id}')">LEER</button></article>`}).join("")}</div>
+  <p class="inventory-note" style="margin-top:12px">Los documentos se guardan automáticamente en tu archivo. <b>No ocupan huecos</b> y no pueden guardarse ni sacarse del baúl.</p>`:`<div class="empty"><div style="font-size:28px;margin-bottom:8px">▤</div><b>ARCHIVO VACÍO</b><br><span>Aún no has encontrado documentos.<br>Explora el distrito, registra escenas y busca pruebas para llenar tu archivo.</span></div>`;
+ openModal("DOCUMENTOS",body,"inv-modal");
 }
 function openMap(){
  const m=MAPS[S.map]||MAPS.barrio;
@@ -4382,8 +4486,10 @@ function openMap(){
 }
 
 function openSafe(){
- const body=`<div class="item-grid">${S.stash.length?S.stash.map((id,i)=>`<div class="item"><div class="ico">${ITEMS[id]?.ico}</div><b>${esc(ITEMS[id]?.name)}</b><small>Baúl</small></div>`).join(""):`<div class="empty" style="grid-column:1/-1">Baúl vacío</div>`}</div>
- <hr style="border-color:#222;margin:15px 0"><div class="nav-buttons"><button class="btn" onclick="saveAtType();document.querySelector('.modal-backdrop')?.remove()">✎ Guardar partida</button><button class="btn" onclick="openInventory(true);document.querySelector('.modal-backdrop')?.remove()">▣ Organizar baúl</button></div>`;
+ const stashCount=(S.stash||[]).length;
+ const body=`<div class="safe-summary"><div class="stat"><span>Objetos en baúl</span><b>${stashCount}</b></div><div class="stat"><span>Inventario</span><b>${slotCount()}/${S.inventoryMax}</b></div></div>
+ <p class="inventory-note">Aquí puedes guardar objetos en el baúl y recuperarlos cuando los necesites. El contenido permanece guardado entre sesiones.</p>
+ <div class="nav-buttons"><button class="btn primary" onclick="document.querySelector('.modal-backdrop')?.remove();openInventory(false)">▣ Guardar objetos</button><button class="btn" onclick="document.querySelector('.modal-backdrop')?.remove();openInventory(true)">▣ Ver / sacar del baúl</button><button class="btn" onclick="saveAtType();document.querySelector('.modal-backdrop')?.remove()">✎ Guardar partida</button></div>`;
  openModal("ZONA SEGURA",body);
 }
 
@@ -4617,7 +4723,7 @@ function renderGame(){
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S){openInventory()}});
 window.showCharacters=showCharacters;window.showDifficulty=showDifficulty;window.startGame=startGame;window.restartCurrentGame=restartCurrentGame;window.wipeAllSaves=wipeAllSaves;window.showContinue=showContinue;window.showHow=showHow;window.renderHome=renderHome;
-window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=window.moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.ensureAudio=ensureAudio;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;
+window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openDocument=openDocument;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=window.moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.ensureAudio=ensureAudio;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;window.storeFromInventory=storeFromInventory;window.takeFromStash=takeFromStash;window.takeAllFromStash=takeAllFromStash;
 applyMode();bindAudioUnlock();window.addEventListener("resize",()=>{if(PREFS.mode==="auto")applyMode()});setTimeout(()=>renderHome(),1500);
 
 // ---- PWA install ----
