@@ -217,13 +217,16 @@ html[data-mode="pc"] .scene-art{height:250px}
 }
 
 
-.portrait-img{background-size:cover!important;background-position:center center!important;background-repeat:no-repeat!important}
-.choice-card .portrait.portrait-img{height:260px;font-size:0;color:transparent}
+.portrait-img{background-size:cover!important;background-position:center 12%!important;background-repeat:no-repeat!important}
+.choice-card .portrait.portrait-img{height:280px;font-size:0;color:transparent}
 .char-card{padding-top:0}
 .char-card .portrait{margin:-20px -20px 16px;border-bottom:1px solid #30383c}
-.portrait-adrian{background-position:center 22%!important}
-.portrait-mara{background-position:center 28%!important}
-@media(max-width:600px){.choice-card .portrait.portrait-img{height:190px}}
+.portrait-adrian{background-position:center 8%!important}
+.portrait-mara{background-position:center 14%!important}
+@media(max-width:900px){.choice-card .portrait.portrait-img{height:240px}}
+@media(max-width:600px){.choice-card .portrait.portrait-img{height:210px;background-position:center 10%!important}
+.portrait-adrian{background-position:center 6%!important}
+.portrait-mara{background-position:center 12%!important}}
 
 
 .modal.map-modal{max-height:none;overflow:hidden;width:min(720px,96vw)}
@@ -277,6 +280,47 @@ body.mobile-mode .combat{grid-template-columns:1fr}
 body.mobile-mode .combat-portrait{height:72px}
 body.mobile-mode .combat-log{height:90px}
 body.mobile-mode .nav-buttons{grid-template-columns:repeat(3,1fr)}
+
+
+/* Mobile game layout: status top, content, resources after choices */
+body.mobile-mode .game{grid-template-columns:1fr;gap:8px}
+body.mobile-mode .sidebar{order:3;display:flex;flex-direction:column;gap:8px}
+body.mobile-mode .sidebar .panel-status{order:0}
+body.mobile-mode .content{order:1}
+body.mobile-mode .sidebar .panel-resources{order:2}
+body.mobile-mode .sidebar .nav-buttons{order:3}
+body.mobile-mode .sidebar .panel-equip{order:4}
+body.mobile-mode .scene{min-height:auto}
+body.mobile-mode .scene-art{height:72px!important;min-height:72px}
+body.mobile-mode .scene-title{font-size:18px!important;margin:6px 0}
+body.mobile-mode .narrative{font-size:14px;line-height:1.45;margin:8px 0}
+body.mobile-mode .choice{padding:12px!important;margin-bottom:6px}
+body.mobile-mode .scene-body{padding:10px 12px}
+body.mobile-mode .mobile-status-bar{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;
+  padding:8px 10px;background:#0e1214;border:1px solid #2a3235;border-radius:10px;margin-bottom:8px
+}
+body.mobile-mode .mobile-status-bar .ms{font:10px monospace;color:#8a9294}
+body.mobile-mode .mobile-status-bar b{display:block;font:700 12px monospace;color:#e8e6dd;margin-top:2px}
+body.mobile-mode .mobile-status-bar .bar{height:4px;margin-top:4px}
+body.mobile-mode .mobile-resources{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;
+  padding:8px 10px;background:#0e1214;border:1px solid #2a3235;border-radius:10px;margin-top:10px
+}
+body.mobile-mode .mobile-resources .ms{font:10px monospace;color:#8a9294;text-align:center}
+body.mobile-mode .mobile-resources b{display:block;font:700 12px monospace;color:#e8e6dd}
+/* Hide duplicate sidebar status/resources on mobile (shown inline) */
+body.mobile-mode .sidebar .panel-status,
+body.mobile-mode .sidebar .panel-resources{display:none!important}
+body.mobile-mode .nav-buttons{grid-template-columns:repeat(3,1fr)!important}
+html:not([data-mode="mobile"]) body:not(.mobile-mode) .mobile-status-bar,
+html:not([data-mode="mobile"]) body:not(.mobile-mode) .mobile-resources{display:none!important}
+html[data-mode="mobile"] .mobile-status-bar{display:grid}
+html[data-mode="mobile"] .mobile-resources{display:grid}
+html[data-mode="mobile"] .sidebar .panel-status,
+html[data-mode="mobile"] .sidebar .panel-resources{display:none!important}
+html[data-mode="mobile"] .game{grid-template-columns:1fr}
+html[data-mode="mobile"] .scene-art{height:72px!important}
 
 </style>
 </head>
@@ -693,9 +737,14 @@ function bindAudioUnlock(){
   try{ getAudioCtx(); }catch(e){}
   resumeMusicFromGesture();
  };
- document.addEventListener("pointerdown",unlock,{passive:true});
- document.addEventListener("touchstart",unlock,{passive:true});
- document.addEventListener("keydown",unlock,{passive:true});
+ // Multiple events — iOS often needs a direct user gesture on Audio.play()
+ ["pointerdown","touchstart","touchend","click","keydown"].forEach(ev=>{
+  document.addEventListener(ev, unlock, {passive:true});
+ });
+}
+function ensureAudio(){
+ try{ getAudioCtx(); }catch(e){}
+ resumeMusicFromGesture();
 }
 
 function setPref(key,val){
@@ -1574,6 +1623,30 @@ Alguien liberó cosas. Alguien también quedó atrapado voluntariamente.`,
 
 
  /* ========== SECTORES EXTRA / PROFUNDIDAD ========== */
+
+ night_market_east:{
+  loc:"Mercado del este",time:"02:58",title:"Generador y lonas",
+  text:`Un generador mantiene tres puestos iluminados. Los civiles aquí no quieren héroes: quieren rutas.
+
+Una niña señala un mapa dibujado en cartón: el túnel del metro marcado en rojo.`,
+  choices:[
+   {t:"Copiar la ruta mentalmente",next:"hub_district",flag:["knowsWater",true],flag2:["kidMap",true]},
+   {t:"Ir al metro",next:"subway",flag:["kidMap",true]},
+   {t:"Dejarles una planta",next:"hub_district",requires:"herbG",flag:["helpedMarketEast",true]}
+  ]
+ },
+ radio_car:{
+  loc:"Coche de prensa volcado",time:"03:08",title:"Antena torcida",
+  text:`El coche aún emite estática. En el asiento, una libreta: “Crowe niega aditivo. Fuentes en depósito asustadas.”
+
+La firma al pie es de un compañero de Mara… o de alguien que escribía como ella.`,
+  choices:[
+   {t:"Guardar la nota",next:"hub_district",doc:"r06",flag:["pressCarNote",true]},
+   {t:"Seguir hacia Canal 7",next:"tv_station",flag:["pressCarNote",true]},
+   {t:"Hub",next:"hub_district"}
+  ]
+ },
+
 
  rooftop_bar:{
   loc:"Azotea del bar Solís",time:"02:33",title:"Luces de la ciudad enferma",
@@ -3494,6 +3567,7 @@ function startGame(char,diff,forceNew=false){
  if(sc0) syncMapFromScene(sc0);
  else if(!S.roomsVisited||!S.roomsVisited.length){S.room='Calle Mercer';S.map='barrio';S.roomsVisited=['Calle Mercer']}
  // Tema del personaje (sustituye intro sin doble reinicio)
+ ensureAudio();
  playMusic(char==="mara" ? "mara" : "adrian");
  renderGame();
 }
@@ -3511,7 +3585,7 @@ function renderHome(){
  <div class="eyebrow">ARCHIVO DE INCIDENTE // 01:47 AM</div><div class="logo">RACCOON<br><span>NIGHTFALL</span><br>FILES</div>
  <p class="tagline">Una novela visual survival horror sobre una ciudad que deja de pertenecer a los vivos. Dos testigos. Una noche. Decisiones que no pueden deshacerse.</p>
  <div class="warning">OBRA FAN-MADE · NO OFICIAL · HISTORIA Y PERSONAJES ORIGINALES</div>
- <div class="menu"><button class="btn primary" onclick="showCharacters()">NUEVA PARTIDA</button><button class="btn" onclick="showContinue()">CONTINUAR</button><button class="btn ghost" onclick="showHow()">ARCHIVO / CÓMO JUGAR</button><button class="btn ghost" onclick="uiSound('choice');openSettings()">⚙ AJUSTES</button><button class="btn ghost" id="pwa-install" style="display:inline-flex" onclick="installPWA()">⬇ INSTALAR APP</button></div>
+ <div class="menu"><button class="btn primary" onclick="showCharacters()">NUEVA PARTIDA</button><button class="btn" onclick="showContinue()">CONTINUAR</button><button class="btn ghost" onclick="showHow()">ARCHIVO / CÓMO JUGAR</button><button class="btn ghost" onclick="uiSound('choice');openSettings()">⚙ AJUSTES</button></div>
  </div></div>`;
 }
 function showCharacters(){
@@ -3581,6 +3655,7 @@ function settingsMarkup(){
   <button class="btn danger" onclick="restartCurrentGame()">↺ Reiniciar</button>
   <button class="btn ghost" onclick="if(confirm('¿Borrar TODOS los guardados?')){wipeAllSaves()}">Borrar guardados</button>
  </div>`:""}
+ <p class="logline" style="text-align:center;margin:4px 0 0;opacity:.7">Raccoon Nightfall Files · v1.0</p>
  </div>`;
 }
 
@@ -3718,7 +3793,8 @@ const ZONE_OF = {
  a_captain:"station",m_photographer:"hub",
  train_station:"hub",train_civ:"hub",train_platform:"hub",
  bridge_east:"hub",bridge_shore:"hub",
- rooftop_bar:"hub",evidence_van:"hub",evidence_van_loot:"hub"
+ rooftop_bar:"hub",evidence_van:"hub",evidence_van_loot:"hub",
+ night_market_east:"hub",radio_car:"hub"
 };
 const ZONE_NAME = {
  mercer:"Calle Mercer",orion:"Tienda Orion",alley:"Callejón",clinic:"Clínica",tunnel:"Túneles",hub:"Distrito Sur",
@@ -3814,7 +3890,7 @@ function finishTravel(){
 }
 
 function processChoice(c){
- uiSound("choice");
+ ensureAudio(); uiSound("choice");
  if(c.requires && !hasItem(c.requires)){uiSound("error");toast("Necesitas: "+(ITEMS[c.requires]?.name||c.requires));return}
  if(c.requires2 && !hasItem(c.requires2)){uiSound("error");toast("También necesitas: "+(ITEMS[c.requires2]?.name||c.requires2));return}
  if(c.requiresFlag && !hasFlag(c.requiresFlag)){uiSound("error");toast(c.lockHint||"Te falta una pista o haber explorado antes");return}
@@ -4452,12 +4528,17 @@ function renderGame(){
  })();
  const content=`<div class="game screen">
  <aside class="sidebar">
-  <div class="panel side-panel"><div class="side-title">ESTADO</div><div class="stat"><span>HP</span><b>${hp}/${S.maxHp}</b></div><div class="bar"><i style="width:${hp}%"></i></div><div class="stat"><span>Estrés</span><b>${stress}</b></div><div class="bar"><i style="width:${stress}%;background:#9c6f3c"></i></div><div class="stat"><span>Ruido</span><b>${S.noise}</b></div><div class="bar"><i style="width:${S.noise}%;background:#6c7071"></i></div></div>
-  <div class="panel side-panel"><div class="side-title">RECURSOS</div><div class="stat"><span>Espacios</span><b>${(typeof slotCount==="function"?slotCount():S.inventory.length)}/${S.inventoryMax}</b></div><div class="stat"><span>Baúl</span><b>${S.stash.length}</b></div>${needsInk?`<div class="stat"><span>Tinta</span><b>${inkCount}</b></div>`:""}<div class="stat"><span>Documentos</span><b>${S.docs.length}</b></div></div>
+  <div class="panel side-panel panel-status"><div class="side-title">ESTADO</div><div class="stat"><span>HP</span><b>${hp}/${S.maxHp}</b></div><div class="bar"><i style="width:${hp}%"></i></div><div class="stat"><span>Estrés</span><b>${stress}</b></div><div class="bar"><i style="width:${stress}%;background:#9c6f3c"></i></div><div class="stat"><span>Ruido</span><b>${S.noise}</b></div><div class="bar"><i style="width:${S.noise}%;background:#6c7071"></i></div></div>
+  <div class="panel side-panel panel-resources"><div class="side-title">RECURSOS</div><div class="stat"><span>Espacios</span><b>${(typeof slotCount==="function"?slotCount():S.inventory.length)}/${S.inventoryMax}</b></div><div class="stat"><span>Baúl</span><b>${S.stash.length}</b></div>${needsInk?`<div class="stat"><span>Tinta</span><b>${inkCount}</b></div>`:""}<div class="stat"><span>Documentos</span><b>${S.docs.length}</b></div></div>
   <div class="panel side-panel nav-buttons"><button class="btn" onclick="uiSound('choice');openInventory()">▣ Inventario</button><button class="btn" onclick="uiSound('choice');openMap()">⌗ Mapa</button><button class="btn" onclick="uiSound('choice');openMissions()">⚑ Misiones</button><button class="btn" onclick="uiSound('choice');openDocs()">▤ Docs</button><button class="btn ${isSafeScene?"":"ghost"}" onclick="uiSound('choice');${isSafeScene?"openSafe()":"toast(&quot;Solo en zonas seguras (máquina de escribir)&quot;)"}">${isSafeScene?"✎ Zona segura":"✎ Guardar"}</button><button class="btn" onclick="uiSound('choice');openSettings()">⚙ Ajustes</button></div>
-  <div class="panel side-panel"><div class="side-title">EQUIPO</div><div class="equip">${equipBtns}</div></div>
+  <div class="panel side-panel panel-equip"><div class="side-title">EQUIPO</div><div class="equip">${equipBtns}</div></div>
  </aside>
  <section class="content"><div class="scene">
+  <div class="mobile-status-bar">
+   <div class="ms">HP<b>${hp}/${S.maxHp}</b><div class="bar"><i style="width:${Math.max(0,hp/S.maxHp*100)}%"></i></div></div>
+   <div class="ms">Estrés<b>${stress}</b><div class="bar"><i style="width:${stress}%;background:#9c6f3c"></i></div></div>
+   <div class="ms">Ruido<b>${S.noise}</b><div class="bar"><i style="width:${S.noise}%;background:#6c7071"></i></div></div>
+  </div>
   <div class="scene-art"><div class="location">${esc(sc.loc)}</div><div class="time">${esc(sc.time)}</div></div>
   <div class="scene-body">
    ${S.combat?`<div class="scene-kicker">ENCUENTRO · PULSO</div><h1 class="scene-title">La amenaza está encima de ti</h1>${combatUI()}`:
@@ -4468,7 +4549,12 @@ function renderGame(){
     const lockMsg = locked ? (c.requires && !hasItem(c.requires) ? " · Requiere "+(ITEMS[c.requires]?.name||c.requires) : c.requiresFlag && !hasFlag(c.requiresFlag) ? " · Bloqueado" : " · Bloqueado") : "";
     return `<button class="choice ${locked?"locked":""}" ${locked?"disabled":""} onclick='processChoice(${JSON.stringify(c).replace(/'/g,"&#39;")})'><b>${i+1}. ${esc(c.t)}</b>${c.hint?`<span class="hint">${esc(c.hint)}</span>`:""}${locked?`<span class="hint">${esc(lockMsg)}</span>`:""}</button>`;
    }).join("")}</div>`}
-   <div class="logline">[${CAMPAIGN[S.char].name}] · ${DIFFS[S.diff].name} · ${formatTime(S.playTime)} · <kbd>Esc</kbd> menú de archivo</div>`}
+   <div class="logline">[${CAMPAIGN[S.char].name}] · ${DIFFS[S.diff].name} · ${formatTime(S.playTime)}</div>
+   <div class="mobile-resources">
+    <div class="ms">Espacios<b>${(typeof slotCount==="function"?slotCount():S.inventory.length)}/${S.inventoryMax}</b></div>
+    <div class="ms">Baúl<b>${S.stash.length}</b></div>
+    <div class="ms">Docs<b>${S.docs.length}</b></div>
+   </div>`}
   </div>
  </div></section></div>`;
  renderShell(content);
@@ -4476,7 +4562,7 @@ function renderGame(){
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S){openInventory()}});
 window.showCharacters=showCharacters;window.showDifficulty=showDifficulty;window.startGame=startGame;window.restartCurrentGame=restartCurrentGame;window.wipeAllSaves=wipeAllSaves;window.showContinue=showContinue;window.showHow=showHow;window.renderHome=renderHome;
-window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=window.moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;
+window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=window.moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.ensureAudio=ensureAudio;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;
 applyMode();bindAudioUnlock();window.addEventListener("resize",()=>{if(PREFS.mode==="auto")applyMode()});setTimeout(()=>renderHome(),1500);
 
 // ---- PWA install ----
