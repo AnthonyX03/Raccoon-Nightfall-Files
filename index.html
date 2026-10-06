@@ -9,7 +9,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="./manifest.json">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%23090b0c' width='192' height='192' rx='28'/%3E%3Ctext x='96' y='118' font-size='72' text-anchor='middle' fill='%23b92828' font-family='monospace' font-weight='900'%3ERN%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+<meta name="apple-mobile-web-app-title" content="Nightfall">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <title>Raccoon Nightfall Files</title>
 <style>
 
@@ -214,11 +217,13 @@ html[data-mode="pc"] .scene-art{height:250px}
 }
 
 
-.portrait-img{background-size:cover!important;background-position:center top!important;background-repeat:no-repeat!important}
-.choice-card .portrait.portrait-img{height:220px;font-size:0;color:transparent}
+.portrait-img{background-size:cover!important;background-position:center center!important;background-repeat:no-repeat!important}
+.choice-card .portrait.portrait-img{height:260px;font-size:0;color:transparent}
 .char-card{padding-top:0}
 .char-card .portrait{margin:-20px -20px 16px;border-bottom:1px solid #30383c}
-@media(max-width:600px){.choice-card .portrait.portrait-img{height:160px}}
+.portrait-adrian{background-position:center 22%!important}
+.portrait-mara{background-position:center 28%!important}
+@media(max-width:600px){.choice-card .portrait.portrait-img{height:190px}}
 
 
 .modal.map-modal{max-height:none;overflow:hidden;width:min(720px,96vw)}
@@ -241,6 +246,38 @@ html[data-mode="pc"] .scene-art{height:250px}
 .item .slot-actions button.act-equip{border-color:#6a5a2a;color:#e8d090}
 .item .slot-actions button.act-use{border-color:#2a6a4a;color:#9ed4b0}
 .equip .btn.primary{box-shadow:0 0 12px #b9282844}
+
+.modal.settings-modal{width:min(420px,96vw);max-height:92vh;overflow:auto;padding:14px}
+.modal.settings-modal .modal-head{margin-bottom:10px}
+.settings-mobile-wrap{display:flex;flex-direction:column;gap:10px}
+.settings-grid-vol{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.settings-card-vol{display:grid!important;grid-template-columns:32px 1fr!important;gap:6px 8px!important;align-items:center;padding:10px!important}
+.settings-card-vol input[type=range]{grid-column:1/-1;width:100%;margin:0}
+.settings-labels b{font:700 11px monospace}
+.settings-labels span{font:700 11px monospace;color:#c39a52}
+.compact-mode{display:flex!important;flex-direction:column;gap:8px;padding:10px!important;margin:0!important}
+.compact-mode .mode-buttons{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:0!important}
+.compact-mode .mode-buttons .btn{width:100%;padding:10px 4px;font-size:11px}
+.settings-actions,.settings-game{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.settings-actions .btn,.settings-game .btn{width:100%;min-height:44px}
+@media(max-width:520px){
+ .settings-grid-vol{grid-template-columns:1fr}
+ .modal.settings-modal{width:96vw;padding:12px}
+}
+/* Combat mobile */
+body.mobile-mode .combat, @media(max-width:700px){
+ .combat{grid-template-columns:1fr!important;gap:8px}
+ .combat-portrait{height:72px!important;font-size:28px!important;margin-bottom:8px!important}
+ .combat-log{height:90px!important;font-size:11px!important}
+ .aim{padding:14px 4px!important;min-height:52px;font-size:12px!important}
+ .combat-actions .btn{min-height:44px;font-size:12px}
+ .combat-card{padding:10px!important}
+}
+body.mobile-mode .combat{grid-template-columns:1fr}
+body.mobile-mode .combat-portrait{height:72px}
+body.mobile-mode .combat-log{height:90px}
+body.mobile-mode .nav-buttons{grid-template-columns:repeat(3,1fr)}
+
 </style>
 </head>
 <body>
@@ -593,61 +630,72 @@ function applyMusicVolume(){
 function stopMusic(fade=false){
  if(!__musicAudio){ __musicTrack=null; return; }
  try{
-  if(fade && __musicAudio.volume>0.05){
-   const a=__musicAudio;
-   let v=a.volume;
-   const step=()=>{ v-=0.08; if(v<=0.02){ a.pause(); a.currentTime=0; __musicAudio=null; __musicTrack=null; }
-     else { a.volume=v; setTimeout(step,40);} };
-   step(); return;
-  }
   __musicAudio.pause();
   __musicAudio.currentTime=0;
  }catch(e){}
  __musicAudio=null; __musicTrack=null;
 }
-
+function applyMusicVolume(){
+ if(!__musicAudio) return;
+ const vol = (PREFS.muted || PREFS.music<=0) ? 0 : (PREFS.music/100)*0.85;
+ try{
+  __musicAudio.volume = Math.max(0, Math.min(1, vol));
+  if(PREFS.muted || PREFS.music<=0){
+   __musicAudio.pause();
+  }else if(__musicTrack && __musicAudio.paused){
+   __musicAudio.play().catch(()=>{});
+  }
+ }catch(e){}
+}
 function playMusic(trackKey, {restart=false}={}){
  if(!MUSIC_TRACKS[trackKey]) return;
+ // Same track already loaded: just ensure playing (no stop/start glitch)
  if(__musicTrack===trackKey && __musicAudio && !restart){
   applyMusicVolume();
-  try{ if(__musicAudio.paused) __musicAudio.play().catch(()=>{}); }catch(e){}
+  try{ if(__musicAudio.paused && !PREFS.muted && PREFS.music>0) __musicAudio.play().catch(()=>{}); }catch(e){}
   return;
  }
- stopMusic(false);
- __musicTrack = trackKey;
  const src = MUSIC_TRACKS[trackKey];
+ // Soft switch: pause old, start new without double-restart loops
+ if(__musicAudio){
+  try{ __musicAudio.pause(); }catch(e){}
+  __musicAudio=null;
+ }
+ __musicTrack = trackKey;
  try{
   const a = new Audio(src);
   a.loop = true;
   a.preload = "auto";
+  a.setAttribute("playsinline","");
+  a.playsInline = true;
   __musicAudio = a;
   applyMusicVolume();
   if(!PREFS.muted && PREFS.music>0){
    const p = a.play();
-   if(p && p.catch) p.catch(()=>{ /* autoplay bloqueado hasta gesto */ });
+   if(p && p.catch) p.catch(()=>{ window.__musicNeedsGesture=true; });
   }
-  a.addEventListener("error",()=>{
-   // Archivo ausente: no romper el juego
-   console.warn("[RNF] No se pudo cargar la pista:", src);
-  });
+  a.addEventListener("error",()=>{ console.warn("[RNF] No se pudo cargar:", src); });
  }catch(e){ __musicAudio=null; __musicTrack=null; }
 }
-
-function startAmbient(){
- // Compat: el “ambiente” del menú es la intro musical
- playMusic("intro");
+function resumeMusicFromGesture(){
+ window.__musicNeedsGesture=false;
+ if(!__musicTrack){
+  if(!S) playMusic("intro");
+  else playMusic(S.char==="mara"?"mara":"adrian");
+ }else{
+  applyMusicVolume();
+  try{ if(__musicAudio && __musicAudio.paused) __musicAudio.play().catch(()=>{}); }catch(e){}
+ }
 }
-
+function startAmbient(){ playMusic("intro"); }
 function bindAudioUnlock(){
  const unlock=()=>{
-  getAudioCtx();
-  if(!S) playMusic("intro");
-  else if(S.char==="adrian") playMusic("adrian");
-  else if(S.char==="mara") playMusic("mara");
+  try{ getAudioCtx(); }catch(e){}
+  resumeMusicFromGesture();
  };
- document.addEventListener("pointerdown",unlock,{once:true});
- document.addEventListener("keydown",unlock,{once:true});
- document.addEventListener("pointerdown",()=>{try{getAudioCtx()}catch(e){}}, {passive:true});
+ document.addEventListener("pointerdown",unlock,{passive:true});
+ document.addEventListener("touchstart",unlock,{passive:true});
+ document.addEventListener("keydown",unlock,{passive:true});
 }
 
 function setPref(key,val){
@@ -665,9 +713,9 @@ function setPref(key,val){
  }
  if(key==="music"||key==="muted"){
   applyMusicVolume();
-  if(!PREFS.muted && PREFS.music>0 && !__musicTrack){
-   if(!S) playMusic("intro");
-   else playMusic(S.char==="mara"?"mara":"adrian");
+  if(!PREFS.muted && PREFS.music>0){
+   if(!__musicTrack){ if(!S) playMusic("intro"); else playMusic(S.char==="mara"?"mara":"adrian"); }
+   else resumeMusicFromGesture();
   }
  }
 }
@@ -1527,6 +1575,338 @@ Alguien liberó cosas. Alguien también quedó atrapado voluntariamente.`,
 
  /* ========== SECTORES EXTRA / PROFUNDIDAD ========== */
 
+ rooftop_bar:{
+  loc:"Azotea del bar Solís",time:"02:33",title:"Luces de la ciudad enferma",
+  text:`Desde la azotea se ve el hospital como un faro y el depósito como un agujero.
+
+Solís fuma sin humo de verdad. “Si bajas al agua, no firmes. Si firmas, no vuelvas.”`,
+  choices:[
+   {t:"Bajar al bar",next:"a_bar"},
+   {t:"Ir al depósito",next:"water_gate",flag:["knowsWater",true]},
+   {t:"Hub",next:"hub_district"}
+  ]
+ },
+ evidence_van:{
+  loc:"Furgón de forenses",time:"03:42",title:"Puerta trasera abierta",
+  text:`Un furgón forense abandonado en doble fila. Dentro, bolsas vacías y una nevera portátil.
+
+La etiqueta dice V-17 — muestra en tránsito — destino: depósito.`,
+  choices:[
+   {t:"Registrar",next:"evidence_van_loot"},
+   {t:"Seguir el GPS del salpicadero",next:"water_gate",flag:["knowsWater",true]},
+   {t:"Hub",next:"hub_district"}
+  ]
+ },
+ evidence_van_loot:{
+  loc:"Furgón de forenses",time:"03:46",title:"Nevera",
+  text:`Solo queda hielo derretido y un suero estabilizador olvidado entre gasas.`,
+  choices:[
+   {t:"Tomar suero",next:"hub_district",give:"serum",flag:["haveSerum",true]},
+   {t:"Al depósito",next:"water_gate",give:"serum",flag:["knowsWater",true]}
+  ]
+ },
+
+
+ bridge_east:{
+  loc:"Puente Este",time:"03:28",title:"Viento y sirenas",
+  text:`El puente cruza el río negro. Abajo, restos de un camión municipal.
+
+En la barandilla alguien grabó: “NO BEBÁIS”. El óxido ya casi borra la advertencia.`,
+  choices:[
+   {t:"Cruzar hacia el depósito",next:"water_gate",flag:["knowsWater",true]},
+   {t:"Bajar a la orilla",next:"bridge_shore"},
+   {t:"Hub",next:"hub_district"}
+  ]
+ },
+ bridge_shore:{
+  loc:"Orilla del río",time:"03:34",title:"Restos del camión",
+  text:`Entre el barro hay un chaleco reflectante y munición mojada pero usable.
+
+Un hinchado emerge del agua hasta las rodillas.`,
+  choices:[
+   {t:"Combatir",combat:"bloater",next:"hub_district",give:["ammo9","ammo9"]},
+   {t:"Huír al puente",next:"bridge_east"}
+  ]
+ },
+
+
+ train_station:{
+  loc:"Estación central",time:"03:12",title:"Andenes cerrados",
+  text:`Los trenes no salen. En el vestíbulo hay maletas abiertas y un panel que aún anuncia destinos imposibles.
+
+Un grupo de civiles discute si ir al hospital o al depósito. Nadie tiene razón del todo.`,
+  choices:[
+   {t:"Hablar con los civiles",next:"train_civ"},
+   {t:"Bajar a los andenes",next:"train_platform"},
+   {t:"Hub",next:"hub_district"}
+  ]
+ },
+ train_civ:{
+  loc:"Estación central",time:"03:16",title:"Rumores en voz baja",
+  text:`“El agua salió mal el martes.” “Vi camiones sin placa.” “Mi hermana trabaja en Saint Ardent y no contesta.”
+
+Una mujer te entrega una planta verde: “Por si acaso. No somos héroes.”`,
+  choices:[
+   {t:"Aceptar y marcar depósito",next:"hub_district",give:"herbG",flag:["knowsWater",true],flag2:["trainRumors",true]},
+   {t:"Andenes",next:"train_platform",give:"herbG"}
+  ]
+ },
+ train_platform:{
+  loc:"Estación — Andén 2",time:"03:20",title:"Vagón abierto",
+  text:`Un vagón de carga está abierto. Dentro, correas y el olor a desinfectante del lab.
+
+Un rastrero se mueve entre asientos arrancados.`,
+  choices:[
+   {t:"Combatir",combat:"crawler",next:"train_station",give:"ammo9"},
+   {t:"Volver al vestíbulo",next:"train_station"}
+  ]
+ },
+
+
+ warehouse_district:{
+  loc:"Naves del polígono",time:"03:40",title:"Puertas de acero",
+  text:`El polígono industrial está a medio cerrar. Una nave tiene luces todavía. En la puerta, el logo del laboratorio Eastside parcialmente raspado.
+
+Dentro hay movimiento: no solo infectados.`,
+  choices:[
+   {t:"Entrar en silencio",next:"warehouse_in"},
+   {t:"Forzar la puerta lateral",next:"warehouse_in",flag:["warehouseNoise",true]},
+   {t:"Hub",next:"hub_district"}
+  ]
+ },
+ warehouse_in:{
+  loc:"Nave Eastside",time:"03:46",title:"Cajas y jaulas",
+  text:`Jaulas vacías. Documentos quemados a medias. Un hombre herido con traje —no Crowe— pide agua.
+
+“La extracción… se adelantó. Crowe dejó a mitad del equipo abajo.”`,
+  choices:[
+   {t:"Interrogarlo",next:"warehouse_talk"},
+   {t:"Registrar la nave",next:"warehouse_loot"},
+   {t:"Un corredor aparece",combat:"runner",next:"warehouse_loot"}
+  ]
+ },
+ warehouse_talk:{
+  loc:"Nave Eastside",time:"03:50",title:"Empleado descartado",
+  text:`“Si van al subnivel, no firmen nada. La caja no es un registro: es semilla. Yo solo movía papeles.”
+
+Te da un fusible si aún no tienes.`,
+  choices:[
+   {t:"Aceptar fusible y salir",next:"hub_district",give:"fuse",flag:["warehouseWitness",true]},
+   {t:"Obligarlo a guiarte al depósito",next:"water_gate",flag:["knowsWater",true],flag2:["warehouseWitness",true]}
+  ]
+ },
+ warehouse_loot:{
+  loc:"Nave Eastside",time:"03:48",title:"Restos útiles",
+  text:`Munición SMG, una planta roja y un mapa interno del depósito con la caseta marcada.`,
+  choices:[
+   {t:"Tomar y salir",next:"hub_district",give:["ammoSmg","herbR"],flag:["knowsWater",true]}
+  ]
+ },
+
+
+ hotel_rooke:{
+  loc:"Hotel Rooke",time:"02:40",title:"Recepción inundada de papel",
+  text:`El Rooke fue elegante hace una década. Ahora el agua del sprinkler empapó el libro de reservas.
+
+En la lista de esta noche aparecen “Crowe +1” y “Equipo hídrico — no molestar”.
+Un botones infectado arrastra una maleta sin ruedas por el vestíbulo.`,
+  choices:[
+   {t:"Combatir al botones",combat:"shambler",next:"hotel_lobby_clear"},
+   {t:"Subir al piso 3 (suite Crowe)",next:"hotel_suite"},
+   {t:"Sótanos / lavandería",next:"hotel_laundry"},
+   {t:"Volver al hub",next:"hub_district"}
+  ]
+ },
+ hotel_lobby_clear:{
+  loc:"Hotel Rooke — Vestíbulo",time:"02:46",title:"Maleta abierta",
+  text:`Dentro de la maleta hay ropa de civil y un distintivo de seguridad del depósito. También munición 9 mm.`,
+  choices:[
+   {t:"Tomar munición y subir",next:"hotel_suite",give:["ammo9","ammo9"]},
+   {t:"Lavandería",next:"hotel_laundry",give:"ammo9"},
+   {t:"Hub",next:"hub_district",give:"ammo9"}
+  ]
+ },
+ hotel_suite:{
+  loc:"Hotel Rooke — Suite 308",time:"02:55",title:"Suite sin huésped",
+  text:`La cama no se ha dormido. En la mesa, una agenda abierta:
+
+“01:30 — salida camiones
+02:10 — periodista Vela (observar, no contactar)
+03:00 — Cole en radio (si sobrevive)”
+
+Tu nombre — el del protagonista que seas — ya estaba escrito antes de que eligieras esta calle.`,
+  choices:[
+   {t:"Registrar el armario",next:"hotel_suite_loot"},
+   {t:"Bajar por la escalera de incendios",next:"hub_district",flag:["readCroweAgenda",true]},
+   {t:"Dejar una trampa improvisada y salir",next:"hub_district",flag:["trappedSuite",true]}
+  ]
+ },
+ hotel_suite_loot:{
+  loc:"Hotel Rooke — Suite 308",time:"02:58",title:"Caja fuerte mini",
+  text:`La caja fuerte del armario está entreabierta. Dentro: cartuchos, un cable aislado y una foto de la caja negra en el subnivel.
+
+Alguien planeaba cobrar y desaparecer.`,
+  choices:[
+   {t:"Tomar todo",next:"hub_district",give:["shells","wire"],flag:["readCroweAgenda",true],flag2:["haveWire",true]},
+   {t:"Solo la foto mental",next:"hub_district",flag:["readCroweAgenda",true]}
+  ]
+ },
+ hotel_laundry:{
+  loc:"Hotel Rooke — Lavandería",time:"02:48",title:"Calor y lejía",
+  text:`Entre secadoras hay un técnico herido, aún consciente.
+
+“No soy de los de Crowe… arreglaba bombas. Cerraron el subnivel con gente dentro. Hale intentó avisar.”
+
+Te ofrece un perno si le das algo para el dolor.`,
+  choices:[
+   {t:"Dar planta verde a cambio del perno",next:"hub_district",requires:"herbG",give:"bolt",flag:["haveBolt",true],flag2:["helpedTechHotel",true]},
+   {t:"Tomar el perno sin pagar",next:"hub_district",give:"bolt",flag:["haveBolt",true],flag2:["robbedTech",true]},
+   {t:"Dejarlo y subir",next:"hotel_suite"}
+  ]
+ },
+ tv_station:{
+  loc:"Canal 7",time:"03:15",title:"En antena / fuera de control",
+  text:`El plató sigue iluminado. Una cámara apunta a una silla vacía. En el control de realización hay un bucle de imágenes del depósito grabadas esta tarde.
+
+Una voz grabada repite: “Mantengan la calma. Es una fuga química contenida.”`,
+  choices:[
+   {t:"Entrar al control",next:"tv_control"},
+   {t:"Estudios de radio",next:"tv_radio"},
+   {t:"Hub",next:"hub_district"}
+  ]
+ },
+ tv_control:{
+  loc:"Canal 7 — Control",time:"03:20",title:"Mentira en bucle",
+  text:`Puedes cortar el bucle y dejar estática… o insertar tu propio mensaje si eres Mara y ya emitiste antes.
+
+Hay un corredor entre los monitores.`,
+  choices:[
+   {t:"Combatir al corredor",combat:"runner",next:"tv_control_clear"},
+   {t:"Cortar la emisión y huir",next:"hub_district",flag:["cutTV",true]},
+   {t:"(Mara) Forzar mensaje de emergencia",next:"m_tv_hijack"}
+  ]
+ },
+ tv_control_clear:{
+  loc:"Canal 7 — Control",time:"03:26",title:"Estática",
+  text:`Los monitores mueren uno a uno. En un cajón: munición SMG y auriculares con sangre.`,
+  choices:[
+   {t:"Tomar munición",next:"tv_station",give:["ammoSmg","ammoSmg"],flag:["cutTV",true]},
+   {t:"Hub",next:"hub_district",give:"ammoSmg"}
+  ]
+ },
+ tv_radio:{
+  loc:"Canal 7 — Radio",time:"03:22",title:"Cabina B",
+  text:`La cabina huele a café quemado. Un locutor muerto aún lleva auriculares. En el cuaderno de bitácora: “Nos prohibieron decir depósito.”`,
+  choices:[
+   {t:"Leer y salir",next:"tv_station",doc:"r01",flag:["tvNotes",true]},
+   {t:"Hub",next:"hub_district",flag:["tvNotes",true]}
+  ]
+ },
+ m_tv_hijack:{
+  loc:"Canal 7 — Control",time:"03:28",title:"Pirata en señal abierta",
+  text:`Mara enlaza treinta segundos: agua, firmas, Crowe, caja negra.
+
+Luego la señal cae. En algún sitio, alguien acaba de escuchar la versión que no saldrá mañana en papel.`,
+  choices:[
+   {t:"Escapar al hub",next:"hub_district",flag:["tvHijack",true]},
+   {t:"Correr al depósito",next:"water_gate",flag:["knowsWater",true],flag2:["tvHijack",true]}
+  ]
+ },
+ chinese_market:{
+  loc:"Mercado nocturno",time:"02:20",title:"Puestos volcados",
+  text:`El mercado callejero quedó a medias: vapor aún sale de una olla. Entre lonas hay un grupo de supervivientes armados con cuchillos de cocina.
+
+Su líder, Jun, acepta hablar si no apuntas.`,
+  choices:[
+   {t:"Hablar con Jun",next:"market_jun"},
+   {t:"Comerciar (planta por munición)",next:"market_trade",requires:"herbG"},
+   {t:"Ignorar y registrar puestos",next:"market_loot"},
+   {t:"Hub",next:"hub_district"}
+  ]
+ },
+ market_jun:{
+  loc:"Mercado nocturno",time:"02:24",title:"Jun",
+  text:`“Vimos furgones al depósito antes del caos. Un policía novato pasó corriendo hace una hora… o alguien con su cara.
+
+Si buscas agua limpia, no la hay. Si buscas respuestas, abajo.”`,
+  choices:[
+   {t:"Preguntar por rutas seguras",next:"market_routes"},
+   {t:"Ofrecer ayuda a cambio de info",next:"market_help"},
+   {t:"Despedirse",next:"chinese_market"}
+  ]
+ },
+ market_routes:{
+  loc:"Mercado nocturno",time:"02:26",title:"Mapa de verbal",
+  text:`Jun describe el metro cerrado y el callejón detrás de Orion. Marca mentalmente el aparcamiento como zona mala de noche.`,
+  choices:[
+   {t:"Anotar y volver",next:"hub_district",flag:["junRoutes",true],flag2:["knowsWater",true]},
+   {t:"Ir al metro",next:"subway",flag:["junRoutes",true]}
+  ]
+ },
+ market_help:{
+  loc:"Mercado nocturno",time:"02:28",title:"Encargo de Jun",
+  text:`“Trae medicina del hospital o de la farmacia. A cambio, llave del almacén del mercado… hay un SMG de un cliente que no volvió.”`,
+  choices:[
+   {t:"Aceptar el encargo",next:"hub_district",flag:["junQuest",true]},
+   {t:"Entregar spray ahora",next:"market_warehouse",requires:"spray",flag:["junQuestDone",true]},
+   {t:"Entregar planta verde ahora",next:"market_warehouse",requires:"herbG",flag:["junQuestDone",true]},
+   {t:"Rechazar",next:"chinese_market"}
+  ]
+ },
+ market_trade:{
+  loc:"Mercado nocturno",time:"02:25",title:"Trueque",
+  text:`Entregas la planta. Jun te pasa un cargador completo de 9 mm y un silencio cómplice.`,
+  choices:[
+   {t:"Volver al mercado",next:"chinese_market",give:["ammo9","ammo9"]}
+  ]
+ },
+ market_loot:{
+  loc:"Mercado nocturno",time:"02:22",title:"Entre lonas",
+  text:`Encuentras una planta azul y latas. Un perro infectado aparece entre los puestos.`,
+  choices:[
+   {t:"Combatir",combat:"dog",next:"chinese_market",give:"herbB"},
+   {t:"Huír al hub",next:"hub_district"}
+  ]
+ },
+ market_warehouse:{
+  loc:"Mercado — Almacén",time:"variable",title:"Puerta de Jun",
+  text:`Si completaste el encargo de medicina, la llave encaja. Dentro: SMG, munición y una nota del “cliente”: coordenadas del depósito.`,
+  choices:[
+   {t:"Tomar SMG",next:"hub_district",give:["smg","ammoSmg"],flag:["haveSmg",true],requiresFlag:"junQuestDone"},
+   {t:"Salir",next:"chinese_market"}
+  ]
+ },
+ cemetery:{
+  loc:"Cementerio del sur",time:"03:50",title:"Rejas abiertas",
+  text:`Las rejas no las abrió el viento. Hay tierra removida que no corresponde a enterramientos legales.
+
+Entre lápidas, un infectado de bata arrastra cadenas de camilla.`,
+  choices:[
+   {t:"Combatir",combat:"labcoat",next:"cemetery_clear"},
+   {t:"Rodear hacia el mausoleo",next:"cemetery_mausoleum"},
+   {t:"Hub",next:"hub_district"}
+  ]
+ },
+ cemetery_clear:{
+  loc:"Cementerio del sur",time:"03:56",title:"Etiquetas de morgue",
+  text:`El de bata llevaba etiquetas del hospital Saint Ardent. Fechas de hoy. Traslados post-mortem… o peores.`,
+  choices:[
+   {t:"Mausoleo",next:"cemetery_mausoleum",flag:["cemeteryTags",true]},
+   {t:"Hub",next:"hub_district",flag:["cemeteryTags",true]}
+  ]
+ },
+ cemetery_mausoleum:{
+  loc:"Cementerio — Mausoleo",time:"04:00",title:"Bajo mármol",
+  text:`El mausoleo esconde una escalera a un túnel de servicio. Huele a cloro y a río.
+
+Atajo hacia el perímetro del depósito para quien ya no crea en la superficie.`,
+  choices:[
+   {t:"Bajar al túnel",next:"sewers",flag:["knowsWater",true]},
+   {t:"Volver al cementerio",next:"cemetery"}
+  ]
+ },
+
+
  pharmacy:{
   loc:"Farmacia 24h",time:"02:25",title:"Persianas a medias",
   text:`La farmacia fue saqueada con método: faltan antibióticos y sobran caramelos.
@@ -2354,7 +2734,9 @@ No pide ayuda. Coordina.`,
     {t:"Misión: repetidor de la frecuencia",next:"a_mission_radio"},
     {t:"Misión: convoy perimetral",next:"a_mission_convoy"},
     {t:"Misión: rastro de Reeves",next:"a_mission_reeves"},
-    {t:"Misión: lista de Lena",next:"a_mission_lena2"}
+    {t:"Misión: lista de Lena",next:"a_mission_lena2"},
+    {t:"Misión: Hotel Rooke",next:"a_mission_hotel"},
+    {t:"Misión: mercado y testigos",next:"a_mission_jun"}
    ]
   },
   a_partner:{
@@ -2488,6 +2870,92 @@ No es un traslado escolar. Es una colecta.`,
     {t:"Avisar en el garaje comunitario",next:"safehouse_civ",flag:["lenaAdmin",true]}
    ]
   },
+
+  a_mission_hotel:{
+   loc:"Distrito Sur",time:"02:35",title:"Misión: Suite bajo vigilancia",
+   text:`En la agenda de la comisaría, alguien anotó “Rooke 308 — vigilancia externa”.
+
+Si Crowe usó el hotel como base, ahí quedan restos de la mentira.`,
+   choices:[
+    {t:"Ir al Hotel Rooke",next:"hotel_rooke"},
+    {t:"Hub",next:"hub_district"}
+   ]
+  },
+  a_mission_jun:{
+   loc:"Distrito Sur",time:"02:18",title:"Misión: Mercado y testigos",
+   text:`Civiles armados en el mercado nocturno pueden haber visto el convoy. Un policía solo no les cae bien… pero un policía con medicina sí.`,
+   choices:[
+    {t:"Ir al mercado",next:"chinese_market"},
+    {t:"Hub",next:"hub_district"}
+   ]
+  },
+
+  a_bar:{
+   loc:"Bar El Último Turno",time:"02:15",title:"Persianas y whisky derramado",
+   text:`El bar de los turnos de noche sigue con la radio baja. El dueño, un exagente llamado Solís, limpia el mismo vaso una y otra vez.
+
+“Si eres de los de Reeves, bebe y lárgate. Si eres Cole… siéntate. Hay cosas que la placa no cubre.”`,
+   choices:[
+    {t:"Escuchar a Solís",next:"a_bar_talk"},
+    {t:"Pedir solo información del depósito",next:"a_bar_water"},
+    {t:"Salir",next:"hub_district"}
+   ]
+  },
+  a_bar_talk:{
+   loc:"Bar El Último Turno",time:"02:20",title:"Off the record",
+   text:`“Reeves intentó frenar el aditivo del martes. Crowe lo compró con amenazas. Torres… Torres solo quería llegar a fin de mes.”
+
+Solís desliza una llave de taquilla de la comisaría.
+
+“Casillero 12. No digas que yo te mandé.”`,
+   choices:[
+    {t:"Tomar la llave",next:"hub_district",give:"keyBrass",flag:["solisHelp",true]},
+    {t:"Ir ya a la comisaría",next:"station_lobby",give:"keyBrass",flag:["solisHelp",true]}
+   ]
+  },
+  a_bar_water:{
+   loc:"Bar El Último Turno",time:"02:18",title:"Dirección en una servilleta",
+   text:`Solís dibuja el perímetro del depósito y marca la caseta del vigilante.
+
+“Entra por ahí si quieres vivir lo suficiente para arrepentirte.”`,
+   choices:[
+    {t:"Al hub",next:"hub_district",flag:["knowsWater",true]},
+    {t:"Al depósito",next:"water_gate",flag:["knowsWater",true]}
+   ]
+  },
+  a_patrol2:{
+   loc:"Control de tráfico abandonado",time:"03:05",title:"Cabina en la perimetral",
+   text:`Una cabina de tráfico con el cristal agrietado. Dentro, un registro de vehículos municipales de la madrugada: tres camiones hacia el depósito, uno de vuelta vacío a las 02:40.
+
+En el suelo, casquillos y una placa policial doblada a propósito.`,
+   choices:[
+    {t:"Guardar el registro mentalmente",next:"hub_district",flag:["trafficLog",true],doc:"r01"},
+    {t:"Seguir la perimetral al convoy",next:"a_mission_convoy",flag:["trafficLog",true]}
+   ]
+  },
+
+  a_captain:{
+   loc:"Azotea comisaría",time:"03:35",title:"El capitán en la radio",
+   text:`Una radio de techo capta al capitán, lejos, con eco de helicóptero.
+
+“A todas las unidades… no, cancelado. Solo extracción prioritaria. El resto… Dios los coja confesados.”
+
+La señal muere. Adrian comprende que la cadena de mando ya eligió a quién salvar.`,
+   choices:[
+    {t:"Bajar al vestíbulo",next:"station_lobby",flag:["heardCaptain",true]},
+    {t:"Depósito: nadie más vendrá",next:"water_gate",flag:["knowsWater",true],flag2:["heardCaptain",true]}
+   ]
+  },
+  a_memo:{
+   loc:"Comisaría — Taquilla 12",time:"02:28",title:"Memo interno",
+   text:`Casillero 12. Dentro, un memo: “Cole no está autorizado para el depósito. Si insiste, derivar a Crowe.”
+
+Alguien decidió tu ruta antes de que salieras a patrullar.`,
+   choices:[
+    {t:"Guardar la rabia y seguir",next:"station_lobby",flag:["seenMemo",true],doc:"a03"},
+    {t:"Al depósito de todos modos",next:"water_gate",flag:["knowsWater",true],flag2:["seenMemo",true]}
+   ]
+  },
   a_ending_note:{
    loc:"Distrito Sur",time:"05:15",title:"Parte de servicio (sin destinatario)",
    text:`Si sobrevives, alguien tendrá que escribir el parte.
@@ -2584,6 +3052,8 @@ Etiqueta: V-17 traslado.`,
     {t:"Misión: redacción del Times",next:"m_mission_press"},
     {t:"Misión: cazar la firma (Crowe)",next:"m_mission_crowe"},
     {t:"Misión: segunda fuente",next:"m_safe_source"},
+    {t:"Misión: Canal 7",next:"m_mission_tv"},
+    {t:"Misión: Crowe en el Rooke",next:"m_mission_hotel"},
     {t:"Abrir mapa mental del distrito",next:"hub_district"}
    ]
   },
@@ -2792,6 +3262,92 @@ Te da una dirección del muelle.`,
     {t:"Hub",next:"hub_district",flag:["sourceMuelle",true]}
    ]
   },
+
+  m_mission_tv:{
+   loc:"Distrito Sur",time:"03:10",title:"Misión: Canal 7",
+   text:`Si el bucle de “fuga química” sigue en antena, la ciudad se traga la versión oficial.
+
+Romper la señal es periodismo o suicidio. A veces es lo mismo.`,
+   choices:[
+    {t:"Ir a Canal 7",next:"tv_station"},
+    {t:"Hub",next:"hub_district"}
+   ]
+  },
+  m_mission_hotel:{
+   loc:"Distrito Sur",time:"02:38",title:"Misión: Crowe en el Rooke",
+   text:`La agenda del firmante mencionaba el hotel. Suite 308. Tu nombre en una línea como si fueras inventario.`,
+   choices:[
+    {t:"Ir al Hotel Rooke",next:"hotel_rooke"},
+    {t:"Hub",next:"hub_district"}
+   ]
+  },
+
+  m_blogger:{
+   loc:"Piso de un bloguero",time:"02:50",title:"Servidores parpadeando",
+   text:`Un contacto menor —ForenseUrbano— dejó la puerta entornada. Las torres siguen subiendo archivos a una nube que quizá nadie lea.
+
+En la pantalla: un borrador sobre “aditivos no declarados en la red sur”.`,
+   choices:[
+    {t:"Copiar el borrador",next:"hub_district",flag:["blogDraft",true],doc:"r02"},
+    {t:"Buscar discos duros",next:"m_blogger_loot"},
+    {t:"Un ruido en el rellano",combat:"crawler",next:"m_blogger_loot"}
+   ]
+  },
+  m_blogger_loot:{
+   loc:"Piso del bloguero",time:"02:55",title:"Evidencia digital",
+   text:`Un pendrive etiquetado “MARTES” y una planta verde junto al teclado.
+
+ForenseUrbano no está. Solo su trabajo a medias.`,
+   choices:[
+    {t:"Tomar todo",next:"hub_district",give:"herbG",flag:["havePendrive",true]},
+    {t:"Ir a Canal 7 con el material",next:"tv_station",give:"herbG",flag:["havePendrive",true]}
+   ]
+  },
+  m_nurse:{
+   loc:"Hospital — Sala de descanso",time:"03:35",title:"La enfermera Elena",
+   text:`Elena se esconde tras una máquina expendedora. Acepta hablar si guardas su nombre fuera de cualquier grabación.
+
+“Trasladaron vivos a gente al depósito. Firmaba Crowe. Nos dijeron que era cuarentena. Mentira.”`,
+   choices:[
+    {t:"Creerla y marcar el depósito",next:"hospital_urgent",flag:["elenaTestimony",true],flag2:["knowsWater",true]},
+    {t:"Pedirle acceso a morgue",next:"morgue_deep",flag:["elenaTestimony",true]},
+    {t:"Ofrecerle escolta a la capilla",next:"safe_hospital",flag:["elenaTestimony",true]}
+   ]
+  },
+  m_darkweb:{
+   loc:"Ciber-café abandonado",time:"03:00",title:"Pantallas que aún respiran",
+   text:`Un terminal sigue logueado en un foro cerrado. Último mensaje: “La periodista del Times se acerca. No la eliminen. Úsenla.”
+
+Te han convertido en pieza antes de que terminaras el reportaje.`,
+   choices:[
+    {t:"Capturar mentalmente el hilo",next:"hub_district",flag:["forumThread",true],doc:"r06"},
+    {t:"Romper el terminal (ruido)",next:"hub_district",flag:["forumSmashed",true]},
+    {t:"Salir hacia el Rooke",next:"hotel_rooke",flag:["forumThread",true]}
+   ]
+  },
+
+  m_photographer:{
+   loc:"Mirador del río",time:"03:55",title:"Colega de oficio",
+   text:`Otro fotógrafo, más viejo, tapa el objetivo con la mano cuando te ve.
+
+“Si publicas, usa mis negativos también. Yo ya no llego al Times.”
+
+Te entrega un carrete y se pierde entre la niebla del río.`,
+   choices:[
+    {t:"Aceptar el carrete",next:"hub_district",give:"film",flag:["colleagueFilm",true]},
+    {t:"Seguirlo hacia los muelles",next:"docks",give:"film",flag:["colleagueFilm",true]}
+   ]
+  },
+  m_press_card:{
+   loc:"Control de prensa improvisado",time:"02:44",title:"Credencial aún válida",
+   text:`Un cordón municipal abandonado tiene tu nombre en una lista de “no autorizar acceso”.
+
+Irónicamente, la credencial del Times aún abre una puerta lateral del edificio de archivos.`,
+   choices:[
+    {t:"Usar la credencial",next:"m_archive",flag:["pressCard",true]},
+    {t:"Hub",next:"hub_district",flag:["pressCard",true]}
+   ]
+  },
   m_ending_note:{
    loc:"Distrito Sur",time:"05:15",title:"Lead para un periódico que ya no existe",
    text:`“Raccoon City no cayó por accidente. Cayó por firma.”
@@ -2839,7 +3395,23 @@ const COMBINED_SCENES = {
  m_mission_crowe: CHAR_SCENES.mara.m_mission_crowe,
  m_mission_publish: CHAR_SCENES.mara.m_mission_publish,
  m_broadcast: CHAR_SCENES.mara.m_broadcast,
- m_safe_source: CHAR_SCENES.mara.m_safe_source
+ m_safe_source: CHAR_SCENES.mara.m_safe_source,
+ a_mission_hotel: CHAR_SCENES.adrian.a_mission_hotel,
+ a_mission_jun: CHAR_SCENES.adrian.a_mission_jun,
+ m_mission_tv: CHAR_SCENES.mara.m_mission_tv,
+ m_mission_hotel: CHAR_SCENES.mara.m_mission_hotel,
+ a_bar: CHAR_SCENES.adrian.a_bar,
+ a_bar_talk: CHAR_SCENES.adrian.a_bar_talk,
+ a_bar_water: CHAR_SCENES.adrian.a_bar_water,
+ a_patrol2: CHAR_SCENES.adrian.a_patrol2,
+ m_blogger: CHAR_SCENES.mara.m_blogger,
+ m_blogger_loot: CHAR_SCENES.mara.m_blogger_loot,
+ m_nurse: CHAR_SCENES.mara.m_nurse,
+ m_darkweb: CHAR_SCENES.mara.m_darkweb,
+ a_captain: CHAR_SCENES.adrian.a_captain,
+ m_photographer: CHAR_SCENES.mara.m_photographer,
+ a_memo: CHAR_SCENES.adrian.a_memo,
+ m_press_card: CHAR_SCENES.mara.m_press_card
 };
 SCENES = Object.assign(SCENES, COMBINED_SCENES);
 
@@ -2921,9 +3493,8 @@ function startGame(char,diff,forceNew=false){
  const sc0=SCENES[S.scene]||CHAR_SCENES[S.char]?.[S.scene];
  if(sc0) syncMapFromScene(sc0);
  else if(!S.roomsVisited||!S.roomsVisited.length){S.room='Calle Mercer';S.map='barrio';S.roomsVisited=['Calle Mercer']}
- // Corta Intro.mp3 y pone tema del personaje (Adrian o Mara)
- stopMusic(false);
- playMusic(char==="mara" ? "mara" : "adrian", {restart:true});
+ // Tema del personaje (sustituye intro sin doble reinicio)
+ playMusic(char==="mara" ? "mara" : "adrian");
  renderGame();
 }
 
@@ -2935,25 +3506,24 @@ function renderShell(content){
  <div class="toast"></div></div>`;
 }
 function renderHome(){
- playMusic("intro");
+ playMusic("intro"); // same track = no glitch
  document.querySelector("#app").innerHTML=`<div class="hero"><div class="hero-grid"></div><div class="hero-inner">
  <div class="eyebrow">ARCHIVO DE INCIDENTE // 01:47 AM</div><div class="logo">RACCOON<br><span>NIGHTFALL</span><br>FILES</div>
  <p class="tagline">Una novela visual survival horror sobre una ciudad que deja de pertenecer a los vivos. Dos testigos. Una noche. Decisiones que no pueden deshacerse.</p>
  <div class="warning">OBRA FAN-MADE · NO OFICIAL · HISTORIA Y PERSONAJES ORIGINALES</div>
- <div class="menu"><button class="btn primary" onclick="showCharacters()">NUEVA PARTIDA</button><button class="btn" onclick="showContinue()">CONTINUAR</button><button class="btn ghost" onclick="showHow()">ARCHIVO / CÓMO JUGAR</button><button class="btn ghost" onclick="uiSound('choice');openSettings()">⚙ AJUSTES</button><button class="btn ghost" id="pwa-install" style="display:none" onclick="installPWA()">⬇ INSTALAR APP</button></div>
- <p class="logline" style="margin-top:10px">Música: coloca <b>Intro.mp3</b>, <b>AdrianCole.mp3</b> y <b>MaraVela.mp3</b> junto a index.html</p>
+ <div class="menu"><button class="btn primary" onclick="showCharacters()">NUEVA PARTIDA</button><button class="btn" onclick="showContinue()">CONTINUAR</button><button class="btn ghost" onclick="showHow()">ARCHIVO / CÓMO JUGAR</button><button class="btn ghost" onclick="uiSound('choice');openSettings()">⚙ AJUSTES</button><button class="btn ghost" id="pwa-install" style="display:inline-flex" onclick="installPWA()">⬇ INSTALAR APP</button></div>
  </div></div>`;
 }
 function showCharacters(){
  renderShell(`<section class="screen"><div class="eyebrow">SELECCIÓN DE TESTIGO</div><h1>¿Quién vivirá la noche?</h1>
  <div class="choice-grid">
   <div class="choice-card char-card" onclick="showDifficulty('adrian')">
-   <div class="portrait portrait-img" style="background-image:url('adrian.jpg')"></div>
+   <div class="portrait portrait-img portrait-adrian" style="background-image:url('adrian.jpg')"></div>
    <span class="role">POLICÍA NOVATO</span><h2>Adrian Cole</h2>
    <p>Empieza solo con pistola y munición. Progresión: escopeta y subfusil. Entrenamiento básico y una radio municipal.</p>
   </div>
   <div class="choice-card char-card" onclick="showDifficulty('mara')">
-   <div class="portrait portrait-img" style="background-image:url('mara.jpg')"></div>
+   <div class="portrait portrait-img portrait-mara" style="background-image:url('mara.jpg')"></div>
    <span class="role">PERIODISTA DE INVESTIGACIÓN</span><h2>Mara Vela</h2>
    <p>Empieza con cámara (flash 100% esquiva). Progresión: pistola y escopeta. Su carrete guarda la primera prueba del brote.</p>
   </div>
@@ -2982,31 +3552,38 @@ function showContinue(){
 
 function settingsMarkup(){
  const mode=effectiveMode();
- return `<section class="settings-grid" style="grid-template-columns:1fr 1fr">
-  <div class="settings-card"><div class="settings-icon">♫</div><div><b>Música</b><span>Ambiente y tensión</span></div><strong>${PREFS.music}%</strong><input data-pref="music" type="range" min="0" max="100" value="${PREFS.music}" oninput="setPref('music',this.value)"></div>
-  <div class="settings-card"><div class="settings-icon">⚡</div><div><b>Efectos</b><span>Disparos, interfaz, combates</span></div><strong>${PREFS.sfx}%</strong><input data-pref="sfx" type="range" min="0" max="100" value="${PREFS.sfx}" oninput="setPref('sfx',this.value)"></div>
- </section>
- <div class="mode-box" style="margin-top:12px;padding:12px;background:#0e1214;border:1px solid #2a3235;border-radius:10px"><div><b>Modo de interfaz</b><small style="display:block;color:#6d7678;font:10px monospace">Cambia distribución y densidad.</small></div>
-  <div class="mode-buttons" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+ return `<div class="settings-mobile-wrap">
+ <div class="settings-grid settings-grid-vol">
+  <div class="settings-card settings-card-vol">
+   <div class="settings-icon">♫</div>
+   <div class="settings-labels"><b>Música</b><span>${PREFS.music}%</span></div>
+   <input data-pref="music" type="range" min="0" max="100" value="${PREFS.music}" oninput="setPref('music',this.value)">
+  </div>
+  <div class="settings-card settings-card-vol">
+   <div class="settings-icon">⚡</div>
+   <div class="settings-labels"><b>Efectos</b><span>${PREFS.sfx}%</span></div>
+   <input data-pref="sfx" type="range" min="0" max="100" value="${PREFS.sfx}" oninput="setPref('sfx',this.value)">
+  </div>
+ </div>
+ <div class="mode-box compact-mode">
+  <b>Interfaz</b>
+  <div class="mode-buttons">
    <button class="btn ${PREFS.mode==='auto'?'primary':''}" onclick="setPref('mode','auto')">AUTO</button>
-   <button class="btn ${PREFS.mode==='mobile'?'primary':''}" onclick="setPref('mode','mobile')">▯ MÓVIL</button>
-   <button class="btn ${PREFS.mode==='pc'?'primary':''}" onclick="setPref('mode','pc')">▣ PC</button>
+   <button class="btn ${PREFS.mode==='mobile'?'primary':''}" onclick="setPref('mode','mobile')">MÓVIL</button>
+   <button class="btn ${PREFS.mode==='pc'?'primary':''}" onclick="setPref('mode','pc')">PC</button>
   </div>
  </div>
- <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-  <button class="btn ${PREFS.muted?'danger':'primary'}" onclick="setPref('muted',${!PREFS.muted})">${PREFS.muted?'🔇 SONIDO DESACTIVADO':'🔊 SONIDO ACTIVADO'}</button>
-  <button class="btn ghost" onclick="getAudioCtx();uiSound('choice');setTimeout(()=>uiSound('shot'),120);setTimeout(()=>uiSound('dodge'),280)">Probar efectos</button>
+ <div class="settings-actions">
+  <button class="btn ${PREFS.muted?'danger':'primary'}" onclick="setPref('muted',${!PREFS.muted})">${PREFS.muted?'🔇 OFF':'🔊 SONIDO'}</button>
+  <button class="btn ghost" onclick="getAudioCtx();resumeMusicFromGesture();uiSound('choice');setTimeout(()=>uiSound('shot'),120)">Probar</button>
  </div>
- ${S?`<div style="margin-top:16px;padding-top:14px;border-top:1px solid #2a3235">
-  <b style="font:700 12px monospace;display:block;margin-bottom:8px">Partida actual</b>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-   <button class="btn danger" onclick="restartCurrentGame()">↺ Reiniciar partida</button>
-   <button class="btn ghost" onclick="if(confirm('¿Borrar TODOS los guardados de este navegador?')){wipeAllSaves()}">Borrar todos los guardados</button>
-  </div>
-  <p class="logline" style="margin-top:8px">Reiniciar borra el progreso de ${esc(CAMPAIGN[S.char].name)} en ${esc(DIFFS[S.diff].name)} y empieza de cero.</p>
+ ${S?`<div class="settings-game">
+  <button class="btn danger" onclick="restartCurrentGame()">↺ Reiniciar</button>
+  <button class="btn ghost" onclick="if(confirm('¿Borrar TODOS los guardados?')){wipeAllSaves()}">Borrar guardados</button>
  </div>`:""}
- <p class="logline">Modo: ${mode.toUpperCase()} · Música: Intro.mp3 / AdrianCole.mp3 / MaraVela.mp3 (misma carpeta que index.html).</p>`;
+ </div>`;
 }
+
 function restartCurrentGame(){
  if(!S)return;
  if(!confirm("¿Reiniciar esta partida desde el principio? Se perderá el progreso no guardado en otra dificultad."))return;
@@ -3030,6 +3607,8 @@ function renderSettings(){
  else openModal("AJUSTES",`<div class="settings-content">${settingsMarkup()}</div>`);
 }
 function openSettings(){renderSettings()}
+
+
 
 function showHow(){
  renderShell(`<section class="screen"><div class="eyebrow">MANUAL DE SUPERVIVENCIA</div><h1>Cómo jugar</h1>
@@ -3128,7 +3707,18 @@ const ZONE_OF = {
  m_mission_press:"hub",m_mission_lab:"hub",
  pharmacy:"hub",pharmacy_counter:"hub",pharmacy_store:"hub",
  firehouse:"hub",fire_tower:"hub",fire_lockers:"hub",
- bank:"hub",bank_vault:"hub",bank_vault_clear:"hub",bank_office:"hub"
+ bank:"hub",bank_vault:"hub",bank_vault_clear:"hub",bank_office:"hub",
+ hotel_rooke:"hub",hotel_lobby_clear:"hub",hotel_suite:"hub",hotel_suite_loot:"hub",hotel_laundry:"hub",
+ tv_station:"hub",tv_control:"hub",tv_control_clear:"hub",tv_radio:"hub",m_tv_hijack:"hub",
+ chinese_market:"hub",market_jun:"hub",market_routes:"hub",market_help:"hub",market_trade:"hub",market_loot:"hub",market_warehouse:"hub",
+ cemetery:"hub",cemetery_clear:"hub",cemetery_mausoleum:"hub",
+ a_bar:"hub",a_bar_talk:"hub",a_bar_water:"hub",a_patrol2:"hub",
+ m_blogger:"hub",m_blogger_loot:"hub",m_nurse:"hospital",m_darkweb:"hub",
+ warehouse_district:"hub",warehouse_in:"hub",warehouse_talk:"hub",warehouse_loot:"hub",
+ a_captain:"station",m_photographer:"hub",
+ train_station:"hub",train_civ:"hub",train_platform:"hub",
+ bridge_east:"hub",bridge_shore:"hub",
+ rooftop_bar:"hub",evidence_van:"hub",evidence_van_loot:"hub"
 };
 const ZONE_NAME = {
  mercer:"Calle Mercer",orion:"Tienda Orion",alley:"Callejón",clinic:"Clínica",tunnel:"Túneles",hub:"Distrito Sur",
@@ -3517,6 +4107,91 @@ window.itemAction=(id,index,stash,action)=>{
 window.equipItem=(id)=>{ window.itemAction(id, -1, false, "equip"); };
 window.useInvItem=(id,index)=>{ window.itemAction(id, index, false, "use"); };
 
+
+function getMissionList(){
+ const f=S.flags||{};
+ const ch=S.char;
+ const list=[];
+ // Shared main
+ list.push({id:"main_box",title:"La caja negra",status:f.destroyedBox||f.extractedBox||f.purged?"done":(f.knowsWater?"active":"locked"),
+  desc:f.knowsWater?"Alcanza el subnivel del depósito y decide el destino de la caja.":"Investiga el distrito hasta localizar el depósito de agua.",
+  go:f.knowsWater?"water_gate":"hub_district"});
+ // Adrian
+ if(ch==="adrian"){
+  list.push({id:"a_lena",title:"Promesa a Lena",status:f.lenaTrace||f.lenaAdmin?"done":(f.promiseLena||f.lenaLead||f.lenaHospital||f.lenaSchool?"active":"available"),
+   desc:"La hija del agente de la Unidad 12. Rastro en instituto o pediatría del hospital.",go:f.lenaAdmin||f.lenaHospital?"hospital_gate":"a_mission_lena2"});
+  list.push({id:"a_reeves",title:"Rastro de Reeves",status:f.reevesTape||f.reevesLoot?"done":(f.reevesLetter?"active":"available"),
+   desc:"El sargento dejó pistas en su casillero y un piso franco.",go:"a_mission_reeves"});
+  list.push({id:"a_radio",title:"Frecuencia privada",status:f.heardExtraction||f.trackedRadio?"done":"available",
+   desc:"Localiza el repetidor o sigue las órdenes hacia el depósito.",go:"a_mission_radio"});
+  list.push({id:"a_convoy",title:"Convoy perimetral",status:f.haveBolt&&f.savedTech?"done":(f.savedTech?"active":"available"),
+   desc:"Un convoy municipal humeante en la avenida perimetral.",go:"a_mission_convoy"});
+  list.push({id:"a_hotel",title:"Suite Rooke",status:f.readCroweAgenda?"done":"available",
+   desc:"Vigilancia externa en el Hotel Rooke, suite 308.",go:"a_mission_hotel"});
+  list.push({id:"a_market",title:"Mercado y testigos",status:f.junRoutes||f.junQuestDone?"done":"available",
+   desc:"Jun y los civiles del mercado nocturno pueden haber visto el convoy.",go:"a_mission_jun"});
+  list.push({id:"a_torres",title:"Deuda con Torres",status:f.torresDebt?"done":"available",
+   desc:"Eco de un compañero de academia en una calle lateral.",go:"a_partner"});
+  list.push({id:"a_bar",title:"Bar El Último Turno",status:f.solisHelp?"done":"available",
+   desc:"Solís, exagente, limpia vasos y secretos de Reeves.",go:"a_bar"});
+  list.push({id:"a_patrol2",title:"Cabina de tráfico",status:f.trafficLog?"done":"available",
+   desc:"Registro de camiones municipales en la perimetral.",go:"a_patrol2"});
+ }
+ // Mara
+ if(ch==="mara"){
+  list.push({id:"m_press",title:"Redacción Times",status:f.pressMission||f.editorDraft||f.haveNegatives?"done":"available",
+   desc:"Tu editor calló a la 01:10. La redacción guarda archivos y un borrador.",go:"m_mission_press"});
+  list.push({id:"m_crowe",title:"Cazar la firma",status:f.huntCrowe||f.knowsCrowe||f.readCroweAgenda?"done":"available",
+   desc:"H. Crowe firma contratos y sonríe junto a la caja negra.",go:"m_mission_crowe"});
+  list.push({id:"m_lab",title:"Lab. Eastside",status:f.labLead||f.haveSerum?"done":"available",
+   desc:"Laboratorio privado de análisis. Más pequeño que el hospital, más fácil de ocultar.",go:"m_mission_lab"});
+  list.push({id:"m_tv",title:"Canal 7",status:f.tvHijack||f.cutTV?"done":"available",
+   desc:"El bucle de «fuga química» sigue mintiendo en antena.",go:"m_mission_tv"});
+  list.push({id:"m_broadcast",title:"Emitir la verdad",status:f.broadcastDone?"done":"available",
+   desc:"Un minuto en la antena municipal puede impedir la versión oficial.",go:"m_mission_publish"});
+  list.push({id:"m_source",title:"Segunda fuente",status:f.sourceMuelle||f.sourceDeadline?"done":"available",
+   desc:"Rastro de tu contacto hacia los muelles o el punto muerto.",go:"m_safe_source"});
+  list.push({id:"m_hotel",title:"Crowe en el Rooke",status:f.readCroweAgenda?"done":"available",
+   desc:"La suite 308 del hotel Rooke.",go:"m_mission_hotel"});
+  list.push({id:"m_blog",title:"ForenseUrbano",status:f.blogDraft||f.havePendrive?"done":"available",
+   desc:"El piso del bloguero y sus archivos del martes.",go:"m_blogger"});
+  list.push({id:"m_elena",title:"Testimonio de Elena",status:f.elenaTestimony?"done":"available",
+   desc:"Enfermera escondida en Saint Ardent.",go:"m_nurse"});
+  list.push({id:"m_forum",title:"Foro cerrado",status:f.forumThread||f.forumSmashed?"done":"available",
+   desc:"Un ciber-café con tu nombre en un hilo privado.",go:"m_darkweb"});
+ }
+ // Shared side
+ list.push({id:"s_civ",title:"Garaje comunitario",status:f.civTrust?"done":"available",
+  desc:"Civiles piden medicina a cambio de rutas al depósito.",go:"safehouse_civ"});
+ list.push({id:"s_pharma",title:"Farmacia 24h",status:f.pharmaLead||f.sawVialPharma?"done":"available",
+  desc:"Saqueo metódico y rastros de V-17.",go:"pharmacy"});
+ list.push({id:"s_fire",title:"Parque de bomberos",status:f.extractionTime?"done":"available",
+  desc:"Mapa con chinchetas y una torre con vista al depósito.",go:"firehouse"});
+ list.push({id:"s_bank",title:"Sucursal bancaria",status:f.bankDocs?"done":"available",
+  desc:"Cajas de seguridad y papeles del lab Eastside.",go:"bank"});
+ list.push({id:"s_cemetery",title:"Cementerio del sur",status:f.cemeteryTags?"done":"available",
+  desc:"Tierra removida y un túnel bajo el mausoleo.",go:"cemetery"});
+ return list;
+}
+function openMissions(){
+ const list=getMissionList();
+ const stLabel={done:"✓ Hecha",active:"● Activa",available:"○ Disponible",locked:"🔒 Bloqueada"};
+ const stColor={done:"#6a9a6a",active:"#c39a52",available:"#8a9092",locked:"#555"};
+ const body=`<p class="inventory-note" style="margin-bottom:10px">Objetivos de ${esc(CAMPAIGN[S.char].name)}. Pulsa <b>Ir</b> para desplazarte al punto de la misión.</p>
+ <div style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto">
+ ${list.map(m=>`<div class="item" style="min-height:auto;cursor:default;border-color:${stColor[m.status]}55">
+  <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+   <b style="font-size:12px">${esc(m.title)}</b>
+   <span style="font:700 10px monospace;color:${stColor[m.status]};white-space:nowrap">${stLabel[m.status]}</span>
+  </div>
+  <small style="display:block;margin:6px 0 8px;color:#9aa0a2;line-height:1.35">${esc(m.desc)}</small>
+  ${m.status!=="locked"&&m.status!=="done"?`<button class="btn small" onclick="document.querySelector('.modal-backdrop')?.remove();processChoice({t:'Misión',next:'${m.go}',skipTravel:false})">Ir</button>`:
+    m.status==="done"?`<span class="logline">Completada</span>`:`<span class="logline">Aún no disponible</span>`}
+ </div>`).join("")}
+ </div>`;
+ openModal("MISIONES",body,"inv-modal");
+}
+
 function openDocs(){
  const body=S.docs.length?S.docs.map(id=>{const d=DOCS[id];return `<article class="doc"><h3>${esc(d.title)}</h3><p>${esc(d.body)}</p><div class="meta">${esc(d.meta)}</div></article>`}).join(""):`<div class="empty">Aún no has encontrado documentos.</div>`;
  openModal("DOCUMENTOS",body);
@@ -3677,10 +4352,76 @@ function combatUI(){
   <button class="btn" onclick="combatDodge()">↝ Esquivar / reposicionarte</button>
   <button class="btn" onclick="combatBreathe()">◌ Controlar respiración</button>
   ${S.hp<75?`<button class="btn" onclick="uiSound('choice');openInventory()">✚ Curarte</button>`:""}
-  <button class="btn danger" onclick="if(confirm('¿Abandonar el enfrentamiento?')){S.combat=null;S.scene=c.next;persist();renderGame()}">↩ Buscar una salida</button>
+  <button class="btn danger" onclick="openEscapeMenu()">↩ Buscar una salida</button>
  </div>
  <p class="logline">Munición: 9mm ${ammo9} · Escopeta ${shells} · SMG ${ammoSmg} · Estrés ${S.stress} · Ruido ${S.noise}${hasCam?` · Flash ${S.flags.flashCharges}`:""}</p></div></div>`;
 }
+function escapeChance(){
+ if(!S.combat) return 0;
+ const e=S.combat.enemy;
+ let base=0.45;
+ const beh=e.behavior||"slow";
+ if(beh==="slow") base=0.55;
+ else if(beh==="fast") base=0.32;
+ else if(beh==="learn") base=0.28;
+ // tyrant / high hp bosses harder
+ if((e.hp||0)>150) base-=0.12;
+ if(S.noise>60) base-=0.1;
+ else if(S.noise<20) base+=0.08;
+ if(S.stress>70) base-=0.08;
+ else if(S.stress<30) base+=0.05;
+ if(hasItem("camera")&&(S.flags.flashCharges||0)>0) base+=0.05;
+ // wounded enemy easier to flee
+ const maxHp=ENEMIES[S.combat.type]?.hp||100;
+ if(e.hp<maxHp*0.4) base+=0.12;
+ return Math.max(0.08, Math.min(0.85, base));
+}
+function openEscapeMenu(){
+ if(!S.combat)return;
+ const pct=Math.round(escapeChance()*100);
+ const e=S.combat.enemy;
+ const body=`<p class="narrative" style="margin-bottom:12px">Intentas romper la distancia con <b>${esc(e.name)}</b>.</p>
+ <div class="stat"><span>Probabilidad de escape</span><b style="color:${pct>=50?"#8dcf8d":pct>=30?"#c39a52":"#c45"}">${pct}%</b></div>
+ <div class="bar" style="margin:8px 0 14px"><i style="width:${pct}%;background:${pct>=50?"#3a8a3a":pct>=30?"#9c6f3c":"#8a3030"}"></i></div>
+ <p class="inventory-note">Depende del tipo de enemigo, su herida, tu ruido y tu estrés. Fallar provoca un ataque inmediato.</p>
+ <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+  <button class="btn primary" onclick="attemptEscape()">Correr ahora (${pct}%)</button>
+  <button class="btn" onclick="attemptEscape(true)">Gastar flash y correr ${hasItem("camera")&&(S.flags.flashCharges||0)>0?"(+25%)":"(sin flash)"}</button>
+  <button class="btn ghost" onclick="document.querySelector('.modal-backdrop')?.remove()">Seguir combatiendo</button>
+ </div>`;
+ openModal("ESCAPAR",body,"inv-modal");
+}
+function attemptEscape(useFlash=false){
+ if(!S.combat)return;
+ let chance=escapeChance();
+ if(useFlash){
+  if(!hasItem("camera")||(S.flags.flashCharges||0)<=0){toast("Sin flash");return}
+  S.flags.flashCharges--;
+  chance=Math.min(0.95, chance+0.25);
+  uiSound("flash");
+ }
+ document.querySelector(".modal-backdrop")?.remove();
+ const roll=Math.random();
+ if(roll<chance){
+  uiSound("dodge");
+  toast("Escapas del enfrentamiento");
+  const next=S.combat.next;
+  S.combat=null;
+  S.noise=Math.min(100,(S.noise||0)+10);
+  S.stress=Math.min(100,(S.stress||0)+6);
+  S.scene=next;
+  const sc=SCENES[next]||CHAR_SCENES[S.char]?.[next];
+  if(sc) syncMapFromScene(sc);
+  persist();renderGame();
+ }else{
+  uiSound("hurt");
+  toast("¡No logras escapar!");
+  combatLog("Intentas huir, pero la criatura te corta el paso.","red");
+  S.stress=Math.min(100,(S.stress||0)+10);
+  combatEnemyTurn();
+ }
+}
+
 function renderGame(){
  if(!S)return renderHome();
  let sc;
@@ -3713,7 +4454,7 @@ function renderGame(){
  <aside class="sidebar">
   <div class="panel side-panel"><div class="side-title">ESTADO</div><div class="stat"><span>HP</span><b>${hp}/${S.maxHp}</b></div><div class="bar"><i style="width:${hp}%"></i></div><div class="stat"><span>Estrés</span><b>${stress}</b></div><div class="bar"><i style="width:${stress}%;background:#9c6f3c"></i></div><div class="stat"><span>Ruido</span><b>${S.noise}</b></div><div class="bar"><i style="width:${S.noise}%;background:#6c7071"></i></div></div>
   <div class="panel side-panel"><div class="side-title">RECURSOS</div><div class="stat"><span>Espacios</span><b>${(typeof slotCount==="function"?slotCount():S.inventory.length)}/${S.inventoryMax}</b></div><div class="stat"><span>Baúl</span><b>${S.stash.length}</b></div>${needsInk?`<div class="stat"><span>Tinta</span><b>${inkCount}</b></div>`:""}<div class="stat"><span>Documentos</span><b>${S.docs.length}</b></div></div>
-  <div class="panel side-panel nav-buttons"><button class="btn" onclick="uiSound('choice');openInventory()">▣ Inventario</button><button class="btn" onclick="uiSound('choice');openMap()">⌗ Mapa</button><button class="btn" onclick="uiSound('choice');openDocs()">▤ Docs</button><button class="btn ${isSafeScene?"":"ghost"}" onclick="uiSound('choice');${isSafeScene?"openSafe()":"toast(&quot;Solo en zonas seguras (máquina de escribir)&quot;)"}">${isSafeScene?"✎ Zona segura":"✎ Guardar"}</button><button class="btn" onclick="uiSound('choice');openSettings()">⚙ Ajustes</button></div>
+  <div class="panel side-panel nav-buttons"><button class="btn" onclick="uiSound('choice');openInventory()">▣ Inventario</button><button class="btn" onclick="uiSound('choice');openMap()">⌗ Mapa</button><button class="btn" onclick="uiSound('choice');openMissions()">⚑ Misiones</button><button class="btn" onclick="uiSound('choice');openDocs()">▤ Docs</button><button class="btn ${isSafeScene?"":"ghost"}" onclick="uiSound('choice');${isSafeScene?"openSafe()":"toast(&quot;Solo en zonas seguras (máquina de escribir)&quot;)"}">${isSafeScene?"✎ Zona segura":"✎ Guardar"}</button><button class="btn" onclick="uiSound('choice');openSettings()">⚙ Ajustes</button></div>
   <div class="panel side-panel"><div class="side-title">EQUIPO</div><div class="equip">${equipBtns}</div></div>
  </aside>
  <section class="content"><div class="scene">
@@ -3735,28 +4476,83 @@ function renderGame(){
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S){openInventory()}});
 window.showCharacters=showCharacters;window.showDifficulty=showDifficulty;window.startGame=startGame;window.restartCurrentGame=restartCurrentGame;window.wipeAllSaves=wipeAllSaves;window.showContinue=showContinue;window.showHow=showHow;window.renderHome=renderHome;
-window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openMap=openMap;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=window.moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;
+window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=window.moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;
 applyMode();bindAudioUnlock();window.addEventListener("resize",()=>{if(PREFS.mode==="auto")applyMode()});setTimeout(()=>renderHome(),1500);
 
 // ---- PWA install ----
 let deferredPrompt=null;
+function isStandalone(){
+ return window.matchMedia("(display-mode: standalone)").matches
+  || window.navigator.standalone === true;
+}
+function showInstallButton(){
+ const b=document.getElementById("pwa-install");
+ if(!b) return;
+ if(isStandalone()){ b.style.display="none"; return; }
+ b.style.display="inline-flex";
+}
 window.addEventListener("beforeinstallprompt", (e)=>{
  e.preventDefault();
  deferredPrompt=e;
- const b=document.getElementById("pwa-install");
- if(b) b.style.display="inline-flex";
+ showInstallButton();
 });
-window.addEventListener("appinstalled",()=>{ deferredPrompt=null; const b=document.getElementById("pwa-install"); if(b)b.style.display="none"; toast("App instalada"); });
-async function installPWA(){
- if(!deferredPrompt){ toast("En el menú del navegador: Instalar app / Añadir a inicio"); return; }
- deferredPrompt.prompt();
- try{ await deferredPrompt.userChoice; }catch(e){}
+window.addEventListener("appinstalled",()=>{
  deferredPrompt=null;
- const b=document.getElementById("pwa-install"); if(b)b.style.display="none";
+ const b=document.getElementById("pwa-install");
+ if(b) b.style.display="none";
+ toast("App instalada");
+});
+function openInstallHelp(){
+ const isiOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+ const isAndroid=/android/i.test(navigator.userAgent);
+ let steps;
+ if(isiOS){
+  steps=`<p class="narrative"><b>iPhone / iPad (Safari)</b></p>
+  <ol style="color:#c8cdc9;font:13px/1.5 sans-serif;padding-left:20px">
+   <li>Toca el botón <b>Compartir</b> (cuadrado con flecha).</li>
+   <li>Elige <b>Añadir a pantalla de inicio</b>.</li>
+   <li>Confirma <b>Añadir</b>.</li>
+  </ol>
+  <p class="logline">En iOS no aparece el prompt automático; se instala desde Compartir.</p>`;
+ }else if(isAndroid){
+  steps=`<p class="narrative"><b>Android (Chrome)</b></p>
+  <ol style="color:#c8cdc9;font:13px/1.5 sans-serif;padding-left:20px">
+   <li>Menú ⋮ → <b>Instalar aplicación</b> o <b>Añadir a pantalla de inicio</b>.</li>
+   <li>O pulsa el botón de instalar si aparece en la barra.</li>
+  </ol>
+  <p class="logline">Necesitas HTTPS (GitHub Pages, Netlify, etc.).</p>`;
+ }else{
+  steps=`<p class="narrative"><b>Escritorio (Chrome / Edge)</b></p>
+  <ol style="color:#c8cdc9;font:13px/1.5 sans-serif;padding-left:20px">
+   <li>Icono <b>⊕ Instalar</b> en la barra de direcciones.</li>
+   <li>O menú ⋮ → <b>Instalar Raccoon Nightfall Files</b>.</li>
+  </ol>
+  <p class="logline">Sirve la carpeta por HTTPS o localhost. Abre <b>index.html</b> desde un servidor, no como archivo local (file://).</p>`;
+ }
+ openModal("INSTALAR APP", steps + `<div style="margin-top:12px"><button class="btn primary" style="width:100%" onclick="document.querySelector('.modal-backdrop')?.remove()">Entendido</button></div>`, "settings-modal");
+}
+async function installPWA(){
+ if(isStandalone()){ toast("Ya está instalada"); return; }
+ if(deferredPrompt){
+  deferredPrompt.prompt();
+  try{ await deferredPrompt.userChoice; }catch(e){}
+  deferredPrompt=null;
+  showInstallButton();
+  return;
+ }
+ openInstallHelp();
 }
 window.installPWA=installPWA;
+window.openInstallHelp=openInstallHelp;
 
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+// Register service worker early and robustly
+if("serviceWorker" in navigator){
+ const reg=()=>navigator.serviceWorker.register("./sw.js",{scope:"./"}).then(()=>showInstallButton()).catch(err=>console.warn("[SW]",err));
+ if(document.readyState==="complete") reg();
+ else window.addEventListener("load", reg);
+}
+// Show install button on home even without beforeinstallprompt (help modal)
+document.addEventListener("DOMContentLoaded", ()=>setTimeout(showInstallButton, 500));
 })();
 
 </script>

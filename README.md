@@ -1,43 +1,34 @@
 # Raccoon Nightfall Files
 
-Juego HTML survival-horror (PWA) — fan-made, personajes originales.
+Juego HTML survival-horror instalable (PWA).
 
-## Dónde poner la música
+## Instalación PWA
 
-Coloca estos **tres archivos MP3 en esta misma carpeta** (junto a `index.html`):
+**Importante:** no abras el juego como `file://`. Tiene que servirse por **HTTP(S)**:
 
-```
-Raccoon_Nightfall/
-├── index.html
-├── manifest.json
-├── sw.js
-├── icon-192.png
-├── icon-512.png
-├── icon.svg
-├── adrian.jpg
-├── mara.jpg
-├── Intro.mp3          ← menú / pantalla de inicio
-├── AdrianCole.mp3     ← al jugar con Adrian (la intro se corta)
-└── MaraVela.mp3       ← al jugar con Mara (la intro se corta)
-```
+- GitHub Pages / Netlify / Vercel, o
+- En local: `npx serve .` / `python -m http.server` y entra en `http://localhost:8080`
 
-Si falta un MP3, el juego sigue funcionando; solo no sonará esa pista.
+### Android (Chrome)
+Menú ⋮ → **Instalar aplicación** o **Añadir a pantalla de inicio**.
 
-## Instalar como PWA
+### iPhone (Safari)
+Compartir → **Añadir a pantalla de inicio**.
 
-1. Sube la carpeta a GitHub Pages, Netlify, o sirve en local con HTTPS/`localhost`.
-2. Abre el juego en Chrome / Edge / Safari (móvil o escritorio).
-3. Menú del navegador → **Instalar aplicación** / **Añadir a pantalla de inicio**.
+### PC (Chrome / Edge)
+Icono **Instalar** en la barra de direcciones.
 
-En escritorio suele aparecer un icono ⊕ en la barra de direcciones.
+## Música (opcional)
 
-## Controles
+En esta carpeta, junto a `index.html`:
 
-- Elige personaje y dificultad (**Nueva partida** no carga guardados viejos).
-- **Continuar** recupera partidas.
-- Zonas seguras: guardar y baúl.
-- Mapa, inventario, equipo, ajustes (reiniciar partida).
+- `Intro.mp3` — menú
+- `AdrianCole.mp3` — partida Adrian
+- `MaraVela.mp3` — partida Mara
 
-## Créditos
+## Archivos
 
-Fan-made. Sin recursos oficiales de Capcom.
+- `index.html` — juego
+- `manifest.json` / `sw.js` — PWA
+- `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`
+- `adrian.jpg`, `mara.jpg`
