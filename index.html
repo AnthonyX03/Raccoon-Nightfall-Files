@@ -218,21 +218,37 @@ html[data-mode="pc"] .scene-art{height:250px}
 
 
 .portrait-img{background-size:cover!important;background-position:center 12%!important;background-repeat:no-repeat!important}
-.choice-card .portrait.portrait-img{height:280px;font-size:0;color:transparent}
+.choice-card .portrait.portrait-img{height:300px;font-size:0;color:transparent}
 .char-card{padding-top:0}
 .char-card .portrait{margin:-20px -20px 16px;border-bottom:1px solid #30383c}
+.portrait-adrian{background-position:center 10%!important}
+.portrait-mara{background-position:center 16%!important}
+@media(max-width:900px){.choice-card .portrait.portrait-img{height:255px}}
+@media(max-width:600px){.choice-card .portrait.portrait-img{height:220px;background-position:center 11%!important}
 .portrait-adrian{background-position:center 8%!important}
-.portrait-mara{background-position:center 14%!important}
-@media(max-width:900px){.choice-card .portrait.portrait-img{height:240px}}
-@media(max-width:600px){.choice-card .portrait.portrait-img{height:210px;background-position:center 10%!important}
-.portrait-adrian{background-position:center 6%!important}
-.portrait-mara{background-position:center 12%!important}}
+.portrait-mara{background-position:center 14%!important}}
 
 
 .modal.map-modal{max-height:none;overflow:hidden;width:min(720px,96vw)}
 .modal.map-modal .map{height:min(480px,62vh);overflow:hidden}
 .modal.inv-modal{width:min(560px,96vw)}
+.mission-list{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto;padding-right:2px}
+.mission-card{min-height:auto;cursor:default;padding:10px 11px}
+.mission-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.mission-head b{font-size:12px}
+.mission-head span{font:700 10px monospace;white-space:nowrap}
+.mission-card small{display:block;margin:6px 0 8px;color:#9aa0a2;line-height:1.35}
+.mission-empty{display:grid;place-items:center;text-align:center;gap:8px;min-height:230px;padding:28px 22px;border:1px dashed #293034;border-radius:10px;background:linear-gradient(180deg,#0b1011,#080b0c)}
+.mission-empty-icon{font:34px monospace;color:#4c5558;line-height:1}
+.mission-empty b{font:700 11px monospace;letter-spacing:.12em;color:#8d9698}
+.mission-empty span{max-width:340px;font:11px/1.6 Georgia,serif;color:#626c6f}
 .item .ico{font-size:26px;line-height:1.2;filter:none}
+@media(max-width:600px){
+ .modal.inv-modal{width:96vw;padding:14px}
+ .mission-list{max-height:62vh}
+ .mission-card{padding:10px}
+ .mission-empty{min-height:210px;padding:24px 16px}
+}
 .item .slot-actions{display:flex;gap:3px;margin-top:4px}
 .item .slot-actions button{flex:1;padding:2px 0;font-size:10px;border:1px solid #333;background:#1a1f20;border-radius:4px;cursor:pointer;color:#aaa}
 .item .slot-actions button:hover{border-color:#888;color:#fff}
@@ -4187,87 +4203,125 @@ window.useInvItem=(id,index)=>{ window.itemAction(id, index, false, "use"); };
 function getMissionList(){
  const f=S.flags||{};
  const ch=S.char;
+ const visited=new Set(S.visited||[]);
+ const seen=(...keys)=>keys.some(k=>visited.has(k));
  const list=[];
- // Shared main
- list.push({id:"main_box",title:"La caja negra",status:f.destroyedBox||f.extractedBox||f.purged?"done":(f.knowsWater?"active":"locked"),
-  desc:f.knowsWater?"Alcanza el subnivel del depósito y decide el destino de la caja.":"Investiga el distrito hasta localizar el depósito de agua.",
-  go:f.knowsWater?"water_gate":"hub_district"});
+ // Missions are discovered through exploration/progression. A fresh game intentionally
+ // starts with an empty mission board; entering a relevant scene or finding its clue
+ // reveals that mission permanently for the current save.
+ const discovered={
+  main:!!(f.knowsWater||seen("water_gate","water_sub","final_lab")),
+  adrian:{
+   lena:!!(f.promiseLena||f.lenaLead||f.lenaHospital||f.lenaSchool||f.lenaTrace||f.lenaAdmin||seen("a_rescue","a_lena_ask","a_lena_search","a_mission_lena2")),
+   reeves:!!(f.reevesLetter||f.reevesTape||f.reevesLoot||seen("a_mission_reeves","station_evidence")),
+   radio:!!(f.heardExtraction||f.trackedRadio||seen("a_mission_radio")),
+   convoy:!!(f.savedTech||f.haveBolt||f.trafficLog||seen("a_mission_convoy","a_patrol2")),
+   hotel:!!(f.readCroweAgenda||seen("a_mission_hotel","hotel_rooke")),
+   market:!!(f.junRoutes||f.junQuestDone||seen("a_mission_jun","market")),
+   torres:!!(f.torresDebt||seen("a_partner","a_partner_after")),
+   bar:!!(f.solisHelp||seen("a_bar","a_bar_talk","a_bar_water")),
+   patrol2:!!(f.trafficLog||seen("a_patrol2"))
+  },
+  mara:{
+   press:!!(f.pressMission||f.editorDraft||f.haveNegatives||seen("m_mission_press","press_archive")),
+   crowe:!!(f.huntCrowe||f.knowsCrowe||f.readCroweAgenda||seen("m_mission_crowe")),
+   lab:!!(f.labLead||f.haveSerum||seen("m_mission_lab","priv_lab")),
+   tv:!!(f.tvHijack||f.cutTV||seen("m_mission_tv")),
+   broadcast:!!(f.broadcastDone||seen("m_mission_publish")),
+   source:!!(f.sourceMuelle||f.sourceDeadline||seen("m_safe_source","docks")),
+   hotel:!!(f.readCroweAgenda||seen("m_mission_hotel")),
+   blog:!!(f.blogDraft||f.havePendrive||seen("m_blogger","m_blogger_loot")),
+   elena:!!(f.elenaTestimony||seen("m_nurse")),
+   forum:!!(f.forumThread||f.forumSmashed||seen("m_darkweb"))
+  },
+  shared:{
+   civ:!!(f.civTrust||seen("safehouse_civ","safehouse_help","safehouse_in")),
+   pharma:!!(f.pharmaLead||f.sawVialPharma||seen("pharmacy","pharmacy_counter","pharmacy_store")),
+   fire:!!(f.extractionTime||seen("firehouse","fire_tower","fire_lockers")),
+   bank:!!(f.bankDocs||f.bankLead||seen("bank","bank_vault","bank_vault_clear","bank_office")),
+   cemetery:!!(f.cemeteryTags||seen("cemetery","cemetery_clear","cemetery_mausoleum"))
+  }
+ };
+ // Shared main mission
+ if(discovered.main){
+  list.push({id:"main_box",title:"La caja negra",status:f.destroyedBox||f.extractedBox||f.purged?"done":(f.knowsWater?"active":"available"),
+   desc:f.knowsWater?"Alcanza el subnivel del depósito y decide el destino de la caja.":"La ruta al depósito ha sido localizada. Decide qué hacer con la información.",
+   go:f.knowsWater?"water_gate":"hub_district"});
+ }
  // Adrian
  if(ch==="adrian"){
-  list.push({id:"a_lena",title:"Promesa a Lena",status:f.lenaTrace||f.lenaAdmin?"done":(f.promiseLena||f.lenaLead||f.lenaHospital||f.lenaSchool?"active":"available"),
+  if(discovered.adrian.lena) list.push({id:"a_lena",title:"Promesa a Lena",status:f.lenaTrace||f.lenaAdmin?"done":(f.promiseLena||f.lenaLead||f.lenaHospital||f.lenaSchool?"active":"available"),
    desc:"La hija del agente de la Unidad 12. Rastro en instituto o pediatría del hospital.",go:f.lenaAdmin||f.lenaHospital?"hospital_gate":"a_mission_lena2"});
-  list.push({id:"a_reeves",title:"Rastro de Reeves",status:f.reevesTape||f.reevesLoot?"done":(f.reevesLetter?"active":"available"),
+  if(discovered.adrian.reeves) list.push({id:"a_reeves",title:"Rastro de Reeves",status:f.reevesTape||f.reevesLoot?"done":(f.reevesLetter?"active":"available"),
    desc:"El sargento dejó pistas en su casillero y un piso franco.",go:"a_mission_reeves"});
-  list.push({id:"a_radio",title:"Frecuencia privada",status:f.heardExtraction||f.trackedRadio?"done":"available",
+  if(discovered.adrian.radio) list.push({id:"a_radio",title:"Frecuencia privada",status:f.heardExtraction||f.trackedRadio?"done":"available",
    desc:"Localiza el repetidor o sigue las órdenes hacia el depósito.",go:"a_mission_radio"});
-  list.push({id:"a_convoy",title:"Convoy perimetral",status:f.haveBolt&&f.savedTech?"done":(f.savedTech?"active":"available"),
+  if(discovered.adrian.convoy) list.push({id:"a_convoy",title:"Convoy perimetral",status:f.haveBolt&&f.savedTech?"done":(f.savedTech?"active":"available"),
    desc:"Un convoy municipal humeante en la avenida perimetral.",go:"a_mission_convoy"});
-  list.push({id:"a_hotel",title:"Suite Rooke",status:f.readCroweAgenda?"done":"available",
+  if(discovered.adrian.hotel) list.push({id:"a_hotel",title:"Suite Rooke",status:f.readCroweAgenda?"done":"available",
    desc:"Vigilancia externa en el Hotel Rooke, suite 308.",go:"a_mission_hotel"});
-  list.push({id:"a_market",title:"Mercado y testigos",status:f.junRoutes||f.junQuestDone?"done":"available",
+  if(discovered.adrian.market) list.push({id:"a_market",title:"Mercado y testigos",status:f.junRoutes||f.junQuestDone?"done":"available",
    desc:"Jun y los civiles del mercado nocturno pueden haber visto el convoy.",go:"a_mission_jun"});
-  list.push({id:"a_torres",title:"Deuda con Torres",status:f.torresDebt?"done":"available",
+  if(discovered.adrian.torres) list.push({id:"a_torres",title:"Deuda con Torres",status:f.torresDebt?"done":"available",
    desc:"Eco de un compañero de academia en una calle lateral.",go:"a_partner"});
-  list.push({id:"a_bar",title:"Bar El Último Turno",status:f.solisHelp?"done":"available",
+  if(discovered.adrian.bar) list.push({id:"a_bar",title:"Bar El Último Turno",status:f.solisHelp?"done":"available",
    desc:"Solís, exagente, limpia vasos y secretos de Reeves.",go:"a_bar"});
-  list.push({id:"a_patrol2",title:"Cabina de tráfico",status:f.trafficLog?"done":"available",
+  if(discovered.adrian.patrol2) list.push({id:"a_patrol2",title:"Cabina de tráfico",status:f.trafficLog?"done":"available",
    desc:"Registro de camiones municipales en la perimetral.",go:"a_patrol2"});
  }
  // Mara
  if(ch==="mara"){
-  list.push({id:"m_press",title:"Redacción Times",status:f.pressMission||f.editorDraft||f.haveNegatives?"done":"available",
+  if(discovered.mara.press) list.push({id:"m_press",title:"Redacción Times",status:f.pressMission||f.editorDraft||f.haveNegatives?"done":"available",
    desc:"Tu editor calló a la 01:10. La redacción guarda archivos y un borrador.",go:"m_mission_press"});
-  list.push({id:"m_crowe",title:"Cazar la firma",status:f.huntCrowe||f.knowsCrowe||f.readCroweAgenda?"done":"available",
+  if(discovered.mara.crowe) list.push({id:"m_crowe",title:"Cazar la firma",status:f.huntCrowe||f.knowsCrowe||f.readCroweAgenda?"done":"available",
    desc:"H. Crowe firma contratos y sonríe junto a la caja negra.",go:"m_mission_crowe"});
-  list.push({id:"m_lab",title:"Lab. Eastside",status:f.labLead||f.haveSerum?"done":"available",
+  if(discovered.mara.lab) list.push({id:"m_lab",title:"Lab. Eastside",status:f.labLead||f.haveSerum?"done":"available",
    desc:"Laboratorio privado de análisis. Más pequeño que el hospital, más fácil de ocultar.",go:"m_mission_lab"});
-  list.push({id:"m_tv",title:"Canal 7",status:f.tvHijack||f.cutTV?"done":"available",
+  if(discovered.mara.tv) list.push({id:"m_tv",title:"Canal 7",status:f.tvHijack||f.cutTV?"done":"available",
    desc:"El bucle de «fuga química» sigue mintiendo en antena.",go:"m_mission_tv"});
-  list.push({id:"m_broadcast",title:"Emitir la verdad",status:f.broadcastDone?"done":"available",
+  if(discovered.mara.broadcast) list.push({id:"m_broadcast",title:"Emitir la verdad",status:f.broadcastDone?"done":"available",
    desc:"Un minuto en la antena municipal puede impedir la versión oficial.",go:"m_mission_publish"});
-  list.push({id:"m_source",title:"Segunda fuente",status:f.sourceMuelle||f.sourceDeadline?"done":"available",
+  if(discovered.mara.source) list.push({id:"m_source",title:"Segunda fuente",status:f.sourceMuelle||f.sourceDeadline?"done":"available",
    desc:"Rastro de tu contacto hacia los muelles o el punto muerto.",go:"m_safe_source"});
-  list.push({id:"m_hotel",title:"Crowe en el Rooke",status:f.readCroweAgenda?"done":"available",
+  if(discovered.mara.hotel) list.push({id:"m_hotel",title:"Crowe en el Rooke",status:f.readCroweAgenda?"done":"available",
    desc:"La suite 308 del hotel Rooke.",go:"m_mission_hotel"});
-  list.push({id:"m_blog",title:"ForenseUrbano",status:f.blogDraft||f.havePendrive?"done":"available",
+  if(discovered.mara.blog) list.push({id:"m_blog",title:"ForenseUrbano",status:f.blogDraft||f.havePendrive?"done":"available",
    desc:"El piso del bloguero y sus archivos del martes.",go:"m_blogger"});
-  list.push({id:"m_elena",title:"Testimonio de Elena",status:f.elenaTestimony?"done":"available",
+  if(discovered.mara.elena) list.push({id:"m_elena",title:"Testimonio de Elena",status:f.elenaTestimony?"done":"available",
    desc:"Enfermera escondida en Saint Ardent.",go:"m_nurse"});
-  list.push({id:"m_forum",title:"Foro cerrado",status:f.forumThread||f.forumSmashed?"done":"available",
+  if(discovered.mara.forum) list.push({id:"m_forum",title:"Foro cerrado",status:f.forumThread||f.forumSmashed?"done":"available",
    desc:"Un ciber-café con tu nombre en un hilo privado.",go:"m_darkweb"});
  }
- // Shared side
- list.push({id:"s_civ",title:"Garaje comunitario",status:f.civTrust?"done":"available",
+ // Shared side missions
+ if(discovered.shared.civ) list.push({id:"s_civ",title:"Garaje comunitario",status:f.civTrust?"done":"available",
   desc:"Civiles piden medicina a cambio de rutas al depósito.",go:"safehouse_civ"});
- list.push({id:"s_pharma",title:"Farmacia 24h",status:f.pharmaLead||f.sawVialPharma?"done":"available",
+ if(discovered.shared.pharma) list.push({id:"s_pharma",title:"Farmacia 24h",status:f.pharmaLead||f.sawVialPharma?"done":"available",
   desc:"Saqueo metódico y rastros de V-17.",go:"pharmacy"});
- list.push({id:"s_fire",title:"Parque de bomberos",status:f.extractionTime?"done":"available",
+ if(discovered.shared.fire) list.push({id:"s_fire",title:"Parque de bomberos",status:f.extractionTime?"done":"available",
   desc:"Mapa con chinchetas y una torre con vista al depósito.",go:"firehouse"});
- list.push({id:"s_bank",title:"Sucursal bancaria",status:f.bankDocs?"done":"available",
+ if(discovered.shared.bank) list.push({id:"s_bank",title:"Sucursal bancaria",status:f.bankDocs?"done":"available",
   desc:"Cajas de seguridad y papeles del lab Eastside.",go:"bank"});
- list.push({id:"s_cemetery",title:"Cementerio del sur",status:f.cemeteryTags?"done":"available",
+ if(discovered.shared.cemetery) list.push({id:"s_cemetery",title:"Cementerio del sur",status:f.cemeteryTags?"done":"available",
   desc:"Tierra removida y un túnel bajo el mausoleo.",go:"cemetery"});
  return list;
 }
 function openMissions(){
  const list=getMissionList();
- const stLabel={done:"✓ Hecha",active:"● Activa",available:"○ Disponible",locked:"🔒 Bloqueada"};
- const stColor={done:"#6a9a6a",active:"#c39a52",available:"#8a9092",locked:"#555"};
- const body=`<p class="inventory-note" style="margin-bottom:10px">Objetivos de ${esc(CAMPAIGN[S.char].name)}. Pulsa <b>Ir</b> para desplazarte al punto de la misión.</p>
- <div style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto">
- ${list.map(m=>`<div class="item" style="min-height:auto;cursor:default;border-color:${stColor[m.status]}55">
-  <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
-   <b style="font-size:12px">${esc(m.title)}</b>
-   <span style="font:700 10px monospace;color:${stColor[m.status]};white-space:nowrap">${stLabel[m.status]}</span>
-  </div>
-  <small style="display:block;margin:6px 0 8px;color:#9aa0a2;line-height:1.35">${esc(m.desc)}</small>
-  ${m.status!=="locked"&&m.status!=="done"?`<button class="btn small" onclick="document.querySelector('.modal-backdrop')?.remove();processChoice({t:'Misión',next:'${m.go}',skipTravel:false})">Ir</button>`:
-    m.status==="done"?`<span class="logline">Completada</span>`:`<span class="logline">Aún no disponible</span>`}
- </div>`).join("")}
- </div>`;
+ const stLabel={done:"✓ Hecha",active:"● Activa",available:"○ Disponible"};
+ const stColor={done:"#6a9a6a",active:"#c39a52",available:"#8a9092"};
+ const intro=list.length
+  ? `Objetivos descubiertos de ${esc(CAMPAIGN[S.char].name)}. Explora el distrito para encontrar nuevas pistas.`
+  : `Todavía no has encontrado ninguna misión. Explora, habla con los supervivientes y registra los lugares que descubras.`;
+ const empty=list.length?"":`<div class="mission-empty"><div class="mission-empty-icon">◌</div><b>NO HAY MISIONES DESCUBIERTAS</b><span>El archivo se irá llenando a medida que encuentres pistas y personas durante la exploración.</span></div>`;
+ const body=`<p class="inventory-note" style="margin-bottom:10px">${intro}</p>
+ ${empty}
+ ${list.length?`<div class="mission-list">${list.map(m=>`<div class="item mission-card" style="border-color:${stColor[m.status]}55">
+  <div class="mission-head"><b>${esc(m.title)}</b><span style="color:${stColor[m.status]}">${stLabel[m.status]}</span></div>
+  <small>${esc(m.desc)}</small>
+  ${m.status!=="done"?`<button class="btn small" onclick="document.querySelector('.modal-backdrop')?.remove();processChoice({t:'Misión',next:'${m.go}',skipTravel:false})">Ir</button>`:`<span class="logline">Completada</span>`}
+ </div>`).join("")}</div>`:""}`;
  openModal("MISIONES",body,"inv-modal");
 }
-
 function openDocs(){
  const body=S.docs.length?S.docs.map(id=>{const d=DOCS[id];return `<article class="doc"><h3>${esc(d.title)}</h3><p>${esc(d.body)}</p><div class="meta">${esc(d.meta)}</div></article>`}).join(""):`<div class="empty">Aún no has encontrado documentos.</div>`;
  openModal("DOCUMENTOS",body);
