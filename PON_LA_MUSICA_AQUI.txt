@@ -1,0 +1,7 @@
+Coloca en ESTA carpeta (junto a index.html) tus archivos de audio:
+
+  Intro.mp3        → suena en el menú / intro
+  AdrianCole.mp3   → suena al jugar con Adrian (corta la intro)
+  MaraVela.mp3     → suena al jugar con Mara (corta la intro)
+
+Nombres exactos (respetar mayúsculas y minúsculas en servidores Linux).
