@@ -676,17 +676,6 @@ function stopAmbient(){
  if(__ambTimer){clearTimeout(__ambTimer);__ambTimer=null}
 }
 
-function applyMusicVolume(){
- if(!__musicAudio) return;
- const vol = (PREFS.muted || PREFS.music<=0) ? 0 : (PREFS.music/100)*0.85;
- __musicAudio.volume = Math.max(0, Math.min(1, vol));
- if(PREFS.muted || PREFS.music<=0){
-  try{__musicAudio.pause()}catch(e){}
- }else{
-  try{ if(__musicAudio.paused && __musicTrack) __musicAudio.play().catch(()=>{}); }catch(e){}
- }
-}
-
 function stopMusic(fade=false){
  if(!__musicAudio){ __musicTrack=null; return; }
  try{
@@ -702,17 +691,31 @@ function applyMusicVolume(){
   __musicAudio.volume = Math.max(0, Math.min(1, vol));
   if(PREFS.muted || PREFS.music<=0){
    __musicAudio.pause();
-  }else if(__musicTrack && __musicAudio.paused){
-   __musicAudio.play().catch(()=>{});
   }
  }catch(e){}
+}
+
+function requestMusicPlayback(){
+ const a=__musicAudio;
+ if(!a || !__musicTrack || PREFS.muted || PREFS.music<=0 || !a.paused) return;
+ if(a.__rnfPlayPending) return;
+ a.__rnfPlayPending=true;
+ try{
+  const p=a.play();
+  if(p && p.then){
+   p.then(()=>{ a.__rnfPlayPending=false; window.__musicNeedsGesture=false; })
+    .catch((err)=>{ a.__rnfPlayPending=false; if(err?.name==='NotAllowedError') window.__musicNeedsGesture=true; });
+  }else{
+   a.__rnfPlayPending=false;
+  }
+ }catch(e){ a.__rnfPlayPending=false; }
 }
 function playMusic(trackKey, {restart=false}={}){
  if(!MUSIC_TRACKS[trackKey]) return;
  // Same track already loaded: just ensure playing (no stop/start glitch)
  if(__musicTrack===trackKey && __musicAudio && !restart){
   applyMusicVolume();
-  try{ if(__musicAudio.paused && !PREFS.muted && PREFS.music>0) __musicAudio.play().catch(()=>{}); }catch(e){}
+  requestMusicPlayback();
   return;
  }
  const src = MUSIC_TRACKS[trackKey];
@@ -730,10 +733,7 @@ function playMusic(trackKey, {restart=false}={}){
   a.playsInline = true;
   __musicAudio = a;
   applyMusicVolume();
-  if(!PREFS.muted && PREFS.music>0){
-   const p = a.play();
-   if(p && p.catch) p.catch(()=>{ window.__musicNeedsGesture=true; });
-  }
+  if(!PREFS.muted && PREFS.music>0) requestMusicPlayback();
   a.addEventListener("error",()=>{ console.warn("[RNF] No se pudo cargar:", src); });
  }catch(e){ __musicAudio=null; __musicTrack=null; }
 }
@@ -744,7 +744,7 @@ function resumeMusicFromGesture(){
   else playMusic(S.char==="mara"?"mara":"adrian");
  }else{
   applyMusicVolume();
-  try{ if(__musicAudio && __musicAudio.paused) __musicAudio.play().catch(()=>{}); }catch(e){}
+  requestMusicPlayback();
  }
 }
 function startAmbient(){ playMusic("intro"); }
@@ -780,7 +780,7 @@ function setPref(key,val){
   applyMusicVolume();
   if(!PREFS.muted && PREFS.music>0){
    if(!__musicTrack){ if(!S) playMusic("intro"); else playMusic(S.char==="mara"?"mara":"adrian"); }
-   else resumeMusicFromGesture();
+   else requestMusicPlayback();
   }
  }
 }
@@ -3582,8 +3582,9 @@ function startGame(char,diff,forceNew=false){
  const sc0=SCENES[S.scene]||CHAR_SCENES[S.char]?.[S.scene];
  if(sc0) syncMapFromScene(sc0);
  else if(!S.roomsVisited||!S.roomsVisited.length){S.room='Calle Mercer';S.map='barrio';S.roomsVisited=['Calle Mercer']}
- // Tema del personaje (sustituye intro sin doble reinicio)
- ensureAudio();
+ // Tema del personaje. No llamamos a ensureAudio() aquí: startGame() suele
+ // ejecutarse dentro del click/tap que inicia la partida, y duplicar play()
+ // en este punto provocaba el efecto de arrancar → parar → volver a arrancar.
  playMusic(char==="mara" ? "mara" : "adrian");
  renderGame();
 }
@@ -3671,7 +3672,7 @@ function settingsMarkup(){
   <button class="btn danger" onclick="restartCurrentGame()">↺ Reiniciar</button>
   <button class="btn ghost" onclick="if(confirm('¿Borrar TODOS los guardados?')){wipeAllSaves()}">Borrar guardados</button>
  </div>`:""}
- <p class="logline" style="text-align:center;margin:4px 0 0;opacity:.7">Raccoon Nightfall Files · v1.0</p>
+ <p class="logline" style="text-align:center;margin:4px 0 0;opacity:.7">Raccoon Nightfall Files · v1.1</p>
  </div>`;
 }
 

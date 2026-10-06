@@ -1,4 +1,4 @@
-# Raccoon Nightfall Files
+# Raccoon Nightfall Files — v1.1
 
 Juego HTML survival-horror instalable (PWA).
 
@@ -19,6 +19,8 @@ Compartir → **Añadir a pantalla de inicio**.
 Icono **Instalar** en la barra de direcciones.
 
 ## Música (opcional)
+
+La reproducción ya no hace un `play → pause → play` al iniciar una partida. El sistema evita llamadas duplicadas a `play()` y conserva la pista actual hasta que realmente cambia de escena/personaje. El navegador puede bloquear el autoplay inicial; en ese caso la primera interacción del usuario desbloquea la música automáticamente.
 
 En esta carpeta, junto a `index.html`:
 

@@ -1,5 +1,5 @@
 /* RNF service worker v4 */
-const CACHE = "rnf-v4";
+const CACHE = "rnf-v5";
 const ASSETS = [
   "./index.html",
   "./manifest.json",
@@ -8,7 +8,10 @@ const ASSETS = [
   "./icon-maskable-512.png",
   "./icon.svg",
   "./adrian.jpg",
-  "./mara.jpg"
+  "./mara.jpg",
+  "./Intro.mp3",
+  "./AdrianCole.mp3",
+  "./MaraVela.mp3"
 ];
 
 self.addEventListener("install", (event) => {
