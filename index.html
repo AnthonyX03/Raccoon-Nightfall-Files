@@ -3678,6 +3678,10 @@ function settingsMarkup(){
   <button class="btn ${PREFS.muted?'danger':'primary'}" onclick="setPref('muted',${!PREFS.muted})">${PREFS.muted?'🔇 OFF':'🔊 SONIDO'}</button>
   <button class="btn ghost" onclick="getAudioCtx();resumeMusicFromGesture();uiSound('choice');setTimeout(()=>uiSound('shot'),120)">Probar</button>
  </div>
+ <div class="settings-actions">
+  <button id="fullscreenBtn" class="btn primary" onclick="toggleFullscreen()">⛶ PANTALLA COMPLETA</button>
+  <button class="btn ghost" onclick="exitFullscreen()">▣ SALIR DE PANTALLA COMPLETA</button>
+ </div>
  ${S?`<div class="settings-game">
   <button class="btn danger" onclick="restartCurrentGame()">↺ Reiniciar</button>
   <button class="btn ghost" onclick="if(confirm('¿Borrar TODOS los guardados?')){wipeAllSaves()}">Borrar guardados</button>
@@ -3710,7 +3714,42 @@ function renderSettings(){
 }
 function openSettings(){renderSettings()}
 
-
+function isFullscreen(){
+ return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+async function enterFullscreen(){
+ const target=document.documentElement;
+ try{
+  if(target.requestFullscreen) await target.requestFullscreen({navigationUI:'hide'});
+  else if(target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+  else { toast("Tu navegador no permite pantalla completa"); return; }
+  uiSound('choice');
+ }catch(e){
+  toast("Pulsa de nuevo para activar pantalla completa");
+ }
+ updateFullscreenButton();
+}
+async function exitFullscreen(){
+ try{
+  if(document.exitFullscreen && document.fullscreenElement) await document.exitFullscreen();
+  else if(document.webkitExitFullscreen && document.webkitFullscreenElement) document.webkitExitFullscreen();
+ }catch(e){}
+ updateFullscreenButton();
+}
+async function toggleFullscreen(){
+ if(isFullscreen()) await exitFullscreen();
+ else await enterFullscreen();
+}
+function updateFullscreenButton(){
+ const b=document.getElementById('fullscreenBtn');
+ if(!b)return;
+ const full=isFullscreen();
+ b.textContent=full?'⛶ PANTALLA COMPLETA: ACTIVADA':'⛶ PANTALLA COMPLETA';
+ b.classList.toggle('primary',!full);
+ b.classList.toggle('danger',full);
+}
+document.addEventListener('fullscreenchange',updateFullscreenButton);
+document.addEventListener('webkitfullscreenchange',updateFullscreenButton);
 
 function showHow(){
  renderShell(`<section class="screen"><div class="eyebrow">MANUAL DE SUPERVIVENCIA</div><h1>Cómo jugar</h1>
@@ -4701,7 +4740,7 @@ function renderGame(){
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S){openInventory()}});
 window.showCharacters=showCharacters;window.showDifficulty=showDifficulty;window.startGame=startGame;window.restartCurrentGame=restartCurrentGame;window.wipeAllSaves=wipeAllSaves;window.showContinue=showContinue;window.showHow=showHow;window.renderHome=renderHome;
-window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openDocument=openDocument;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=window.moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.ensureAudio=ensureAudio;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;window.storeFromInventory=storeFromInventory;window.takeFromStash=takeFromStash;window.takeAllFromStash=takeAllFromStash;
+window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.toggleFullscreen=toggleFullscreen;window.enterFullscreen=enterFullscreen;window.exitFullscreen=exitFullscreen;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openDocument=openDocument;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=window.moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.ensureAudio=ensureAudio;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;window.storeFromInventory=storeFromInventory;window.takeFromStash=takeFromStash;window.takeAllFromStash=takeAllFromStash;
 applyMode();bindAudioUnlock();window.addEventListener("resize",()=>{if(PREFS.mode==="auto")applyMode()});setTimeout(()=>renderHome(),1500);
 
 // ---- PWA install ----
