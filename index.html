@@ -4046,7 +4046,17 @@ function combine(a,b){
 }
 function openModal(title,body,extraClass=""){
  const m=document.createElement("div");m.className="modal-backdrop";
- m.innerHTML=`<div class="modal ${extraClass}"><div class="modal-head"><h2>${esc(title)}</h2><button class="close" onclick="this.closest('.modal-backdrop').remove()">✕</button></div>${body}</div>`;
+ const closeAction = (extraClass||"").includes("inv-modal")
+  ? "closeInventoryModal()"
+  : "this.closest('.modal-backdrop').remove()";
+ m.innerHTML=`<div class="modal ${extraClass}"><div class="modal-head"><h2>${esc(title)}</h2><button type="button" class="close" onclick="${closeAction}">✕</button></div>${body}</div>`;
+ // Click on backdrop (outside modal) also closes inventory cleanly
+ m.addEventListener("click", (ev)=>{
+  if(ev.target===m){
+   if((extraClass||"").includes("inv-modal")) closeInventoryModal();
+   else m.remove();
+  }
+ });
  document.body.appendChild(m);return m;
 }
 function groupedInventory(arr){
@@ -4079,44 +4089,71 @@ function slotCount(){
  return n;
 }
 function buildSlotList(){
- // Respect S.invOrder if present; otherwise default order
+ // Returns array of length inventoryMax; entries are {kind,id,qty?} or null for empty
  recomputeInventoryMax();
  const inv = S.inventory||[];
- if(!S.invOrder) S.invOrder = [];
- // Build entries
- const entries = [];
- // From invOrder first
- const used = new Set();
- for(const entry of S.invOrder){
-  if(entry.kind==="ammo"){
-   if((S.ammo[entry.id]||0)>0){ entries.push({kind:"ammo",id:entry.id,qty:S.ammo[entry.id]}); used.add("ammo:"+entry.id); }
-  } else if(entry.kind==="item" && inv.includes(entry.id)){
-   // count occurrences
-   const count = inv.filter(x=>x===entry.id).length;
-   const already = entries.filter(e=>e.kind==="item"&&e.id===entry.id).length;
-   if(already < count){ entries.push({kind:"item",id:entry.id}); used.add("item:"+entry.id+":"+already); }
-  }
- }
- // Append missing inventory items
- const invCounts = {};
- for(const id of inv){ invCounts[id]=(invCounts[id]||0)+1; }
- const placed = {};
- for(const e of entries){ if(e.kind==="item") placed[e.id]=(placed[e.id]||0)+1; }
- for(const id of inv){
-  placed[id]=placed[id]||0;
-  if(placed[id] < invCounts[id]){ entries.push({kind:"item",id}); placed[id]++; }
- }
- // Append ammo not in order
+ const max = S.inventoryMax||8;
+ if(!S.ammo) S.ammo={ammo9:0,shells:0,ammoSmg:0};
+
+ // Collect available pieces
+ const bag = [];
+ for(const id of inv) bag.push({kind:"item", id});
  for(const id of ["ammo9","shells","ammoSmg"]){
-  if((S.ammo[id]||0)>0 && !entries.some(e=>e.kind==="ammo"&&e.id===id))
-   entries.push({kind:"ammo",id,qty:S.ammo[id]});
-  else if((S.ammo[id]||0)>0){
-   const e=entries.find(x=>x.kind==="ammo"&&x.id===id); if(e) e.qty=S.ammo[id];
+  if((S.ammo[id]||0)>0) bag.push({kind:"ammo", id, qty:S.ammo[id]});
+ }
+
+ // Normalize invOrder to fixed length with null empties
+ let order = Array.isArray(S.invOrder) ? S.invOrder.slice() : [];
+ // Upgrade legacy dense orders (no nulls) — keep sequence, pad with null
+ if(order.length && order.every(e=>e && e.id)){
+  while(order.length < max) order.push(null);
+  if(order.length > max) order = order.slice(0, max);
+ } else {
+  while(order.length < max) order.push(null);
+  if(order.length > max) order = order.slice(0, max);
+ }
+
+ // Match bag items into order positions; remove stale; append missing at end
+ const usedKey = new Set();
+ const result = new Array(max).fill(null);
+ const keyOf = (e)=> e ? (e.kind+":"+e.id+(e.kind==="item"?":"+Math.random():"")) : null;
+
+ // For items we need multiplicity; track remaining counts
+ const remainItem = {};
+ for(const id of inv) remainItem[id]=(remainItem[id]||0)+1;
+ const remainAmmo = {};
+ for(const id of ["ammo9","shells","ammoSmg"]) if((S.ammo[id]||0)>0) remainAmmo[id]=1;
+
+ for(let i=0;i<max;i++){
+  const e = order[i];
+  if(!e || !e.id) continue;
+  if(e.kind==="ammo"){
+   if(remainAmmo[e.id]){
+    result[i]={kind:"ammo",id:e.id,qty:S.ammo[e.id]};
+    delete remainAmmo[e.id];
+   }
+  } else if(e.kind==="item"){
+   if((remainItem[e.id]||0)>0){
+    result[i]={kind:"item",id:e.id};
+    remainItem[e.id]--;
+   }
   }
  }
- // Save order
- S.invOrder = entries.map(e=>({kind:e.kind,id:e.id}));
- return entries;
+ // Place leftovers in first empty slots
+ const leftovers=[];
+ for(const id of Object.keys(remainItem)){
+  for(let n=0;n<remainItem[id];n++) leftovers.push({kind:"item",id});
+ }
+ for(const id of Object.keys(remainAmmo)) leftovers.push({kind:"ammo",id,qty:S.ammo[id]});
+ for(const left of leftovers){
+  const idx=result.findIndex(x=>x===null);
+  if(idx>=0) result[idx]=left;
+  else break;
+ }
+
+ // Persist sparse order (nulls included)
+ S.invOrder = result.map(e=> e ? {kind:e.kind,id:e.id} : null);
+ return result;
 }
 function isCurrentSafe(){
  const sc=SCENES[S.scene]||CHAR_SCENES[S.char]?.[S.scene];
@@ -4169,7 +4206,7 @@ function toggleStorageSelection(key,el){
 function storageSelectionCount(){return _storageSelection.size}
 function inventoryIndexForSlot(slotIndex){
  const slots=buildSlotList(); const s=slots[slotIndex]; if(!s||s.kind!=="item")return -1;
- let occurrence=0; for(let i=0;i<slotIndex;i++) if(slots[i].kind==="item"&&slots[i].id===s.id) occurrence++;
+ let occurrence=0; for(let i=0;i<slotIndex;i++) if(slots[i]&&slots[i].kind==="item"&&slots[i].id===s.id) occurrence++;
  let seen=0; for(let i=0;i<(S.inventory||[]).length;i++){ if(S.inventory[i]===s.id){ if(seen===occurrence)return i; seen++; }}
  return -1;
 }
@@ -4252,14 +4289,16 @@ function takeAllFromStash(){
 }
 
 /* ---- Reorder system ---- */
+function closeAllModals(){
+ document.querySelectorAll(".modal-backdrop").forEach(m=>m.remove());
+}
 function startReorderMode(){
  window.__combineMode=false; _combineSel=null;
  window.__reorderMode=true; _reorderFrom=null;
  clearStorageSelection();
  const hint=document.getElementById("inv-hint");
- if(hint)hint.textContent="Modo ordenar: toca un objeto y luego la casilla destino.";
- toast("Ordenar: elige objeto → casilla destino");
- // refresh highlight classes
+ if(hint)hint.textContent="Modo ordenar: toca un objeto y luego la casilla destino (también vacía).";
+ toast("Ordenar: objeto → casilla destino");
  document.querySelectorAll(".storage-card,.empty-slot").forEach(el=>el.classList.add("reorder-ready"));
 }
 function cancelReorderMode(){
@@ -4269,68 +4308,81 @@ function cancelReorderMode(){
  if(hint)hint.textContent="Selecciona objetos para el baúl o usa Combinar / Ordenar.";
 }
 function handleReorderClick(key,el){
- // key: invslot:N or empty:N or ammo:id
  let toIndex=null;
  if(key.startsWith("invslot:")) toIndex=Number(key.slice(8));
  else if(key.startsWith("empty:")) toIndex=Number(key.slice(6));
  else if(key.startsWith("ammo:")){
-  // find ammo slot index in buildSlotList
   const slots=buildSlotList();
-  toIndex=slots.findIndex(s=>s.kind==="ammo"&&s.id===key.slice(5));
+  toIndex=slots.findIndex(s=>s && s.kind==="ammo" && s.id===key.slice(5));
   if(toIndex<0){toast("No encontrado");return}
  }else{toast("Casilla no válida");return}
 
+ if(Number.isNaN(toIndex) || toIndex<0){toast("Casilla no válida");return}
+
+ const slots=buildSlotList(); // length = inventoryMax, may contain null
+
  if(_reorderFrom===null){
-  // Must pick a filled slot
-  const slots=buildSlotList();
-  if(toIndex>=slots.length||!slots[toIndex]){toast("Elige primero un objeto ocupado");return}
+  // Pick source: must be occupied
+  if(!slots[toIndex]){toast("Elige primero un objeto ocupado");return}
   _reorderFrom=toIndex;
   document.querySelectorAll(".selected-reorder").forEach(e=>e.classList.remove("selected-reorder"));
   el?.classList.add("selected-reorder");
   const hint=document.getElementById("inv-hint");
-  if(hint)hint.textContent=`Objeto en casilla ${toIndex+1} seleccionado. Toca la casilla destino.`;
+  if(hint)hint.textContent=`Casilla ${toIndex+1} seleccionada. Toca destino (vacía o ocupada).`;
   toast(`Origen: casilla ${toIndex+1}`);
   uiSound("choice");
   return;
  }
- // Move / swap within invOrder
+
  const from=_reorderFrom;
- if(from===toIndex){ cancelReorderMode(); openInventory(false); return; }
- const slots=buildSlotList();
- // Ensure invOrder has length inventoryMax with nulls for empty
- let order=slots.map(s=>({kind:s.kind,id:s.id}));
- while(order.length<S.inventoryMax) order.push(null);
- // clamp to
- if(toIndex<0) toIndex=0;
- if(toIndex>=S.inventoryMax) toIndex=S.inventoryMax-1;
- const item=order[from];
- if(!item){ cancelReorderMode(); openInventory(false); return; }
- // remove from origin
- order.splice(from,1);
- // insert at destination (adjust index if we removed before dest)
- let dest=toIndex;
- if(from<toIndex) dest=toIndex-1;
- order.splice(dest,0,item);
- // strip trailing nulls but keep structure
- S.invOrder=order.filter(Boolean);
+ if(from===toIndex){
+  // cancel selection only
+  _reorderFrom=null;
+  el?.classList.remove("selected-reorder");
+  document.querySelectorAll(".selected-reorder").forEach(e=>e.classList.remove("selected-reorder"));
+  const hint=document.getElementById("inv-hint");
+  if(hint)hint.textContent="Modo ordenar: toca un objeto y luego la casilla destino.";
+  toast("Selección cancelada");
+  return;
+ }
+
+ // Build sparse order array
+ let order = slots.map(s=> s ? {kind:s.kind,id:s.id} : null);
+ while(order.length < S.inventoryMax) order.push(null);
+ if(order.length > S.inventoryMax) order = order.slice(0, S.inventoryMax);
+
+ const item = order[from];
+ if(!item){ cancelReorderMode(); refreshInventoryModal(); return; }
+
+ // Swap with destination (works for empty or filled)
+ const other = order[toIndex];
+ order[toIndex] = item;
+ order[from] = other; // null if was empty
+
+ S.invOrder = order;
  _reorderFrom=null;
  window.__reorderMode=false;
  persist();
  uiSound("choice");
- toast(`Movido a casilla ${dest+1}`);
- openInventory(false);
+ toast(other ? `Intercambiado ${from+1} ↔ ${toIndex+1}` : `Movido a casilla ${toIndex+1}`);
+ refreshInventoryModal();
 }
 function moveInvSlot(i,dir){
- // Legacy support: still works if called
  const slots=buildSlotList();
  const j=i+dir;
- if(j<0||j>=Math.max(slots.length,S.inventoryMax)) return;
- let order=slots.map(s=>({kind:s.kind,id:s.id}));
+ if(j<0||j>=S.inventoryMax) return;
+ let order = slots.map(s=> s ? {kind:s.kind,id:s.id} : null);
  while(order.length<S.inventoryMax) order.push(null);
  if(!order[i]) return;
  const tmp=order[i]; order[i]=order[j]; order[j]=tmp;
- S.invOrder=order.filter(Boolean);
+ S.invOrder=order;
  persist();
+ refreshInventoryModal();
+}
+function refreshInventoryModal(){
+ // Close any open inventory modals and reopen cleanly
+ closeAllModals();
+ cancelReorderMode();
  openInventory(false);
 }
 
@@ -4342,27 +4394,30 @@ function openInventory(stash=false){
  clearStorageSelection();
  recomputeInventoryMax();
  const safe=isCurrentSafe();
+ // Always close previous modals to avoid stacking / ghost reorder UI
+ closeAllModals();
  if(stash){
   if(!safe){toast("El baúl solo está disponible en zonas seguras");return}
   const arr=S.stash||[]; const counts={}; for(const id of arr)counts[id]=(counts[id]||0)+1;
   const grouped=Object.entries(counts);
-  const body=`<div class="tabs"><button class="tab" onclick="clearStorageSelection();document.querySelector('.modal-backdrop')?.remove();openInventory(false)">INVENTARIO (${slotCount()}/${S.inventoryMax})</button><button class="tab active">BAÚL (${arr.length})</button></div>
+  const body=`<div class="tabs"><button class="tab" onclick="openInventory(false)">INVENTARIO (${slotCount()}/${S.inventoryMax})</button><button class="tab active">BAÚL (${arr.length})</button></div>
   <div class="storage-help">Selecciona objetos y pulsa <b>SACAR SELECCIONADOS</b>.</div>
   <div class="item-grid">${grouped.length?grouped.map(([id,qty])=>{const it=ITEMS[id]||{};return `<div class="item storage-card" onclick="toggleStorageSelection('stash:${id}',this)"><div class="ico">${it.ico||"?"}</div><b>${esc(it.name||id)}</b><span class="qty">×${qty}</span><small>Toca para seleccionar</small></div>`}).join(""):`<div class="empty" style="grid-column:1/-1">Baúl vacío</div>`}</div>
   <div class="storage-footer"><span><b id="storage-selected-count">0</b> seleccionados</span><div>
    <button class="btn small" onclick="takeSelectedFromStash()">▣ Sacar seleccionados</button>
    <button class="btn small ghost" onclick="takeAllFromStash()">Sacar todo</button>
    <button class="btn small ghost" onclick="clearStorageSelection();openInventory(true)">Limpiar</button>
-   <button class="btn small ghost" onclick="clearStorageSelection();document.querySelector('.modal-backdrop')?.remove()">Cerrar</button>
+   <button class="btn small ghost" onclick="closeInventoryModal()">Cerrar</button>
   </div></div>
   <p class="inventory-note">La munición se apila al sacarla. Si no hay espacio, solo se saca lo que quepa.</p>`;
   openModal("BAÚL",body,"inv-modal"); return;
  }
- const slots=buildSlotList(); const used=slots.length; let cells="";
+ const slots=buildSlotList(); // sparse length max
+ let used=slots.filter(Boolean).length; let cells="";
  for(let i=0;i<S.inventoryMax;i++){
   const s=slots[i];
   if(!s){
-   cells+=`<div class="item empty-slot" onclick="toggleStorageSelection('empty:${i}',this)"><div class="ico" style="opacity:.2">·</div><b style="opacity:.3">Vacío</b><small>${i+1}/${S.inventoryMax}</small></div>`;
+   cells+=`<div class="item empty-slot" data-slot="${i}" onclick="toggleStorageSelection('empty:${i}',this)"><div class="ico" style="opacity:.2">·</div><b style="opacity:.3">Vacío</b><small>${i+1}/${S.inventoryMax}</small></div>`;
    continue;
   }
   const it=ITEMS[s.id]||{name:s.id,ico:"?",type:"?"};
@@ -4378,27 +4433,34 @@ function openInventory(stash=false){
    else if(it.type==="expand") actionBtns=`<div class="slot-actions"><button type="button" onclick="event.stopPropagation();useInvItem('${s.id}',${idx})">Info +2</button></div>`;
    else actionBtns=`<div class="slot-actions"><button type="button" onclick="event.stopPropagation();itemAction('${s.id}',${idx},false)">Info</button></div>`;
   }
-  cells+=`<div class="item storage-card" onclick="toggleStorageSelection('${selectKey}',this)"><div class="ico">${it.ico||"?"}</div><b>${esc(it.name)}</b>${eq}${qty}<small>${it.type||""}${safe?" · Toca para baúl":""}</small>${actionBtns}</div>`;
+  cells+=`<div class="item storage-card" data-slot="${i}" onclick="toggleStorageSelection('${selectKey}',this)"><div class="ico">${it.ico||"?"}</div><b>${esc(it.name)}</b>${eq}${qty}<small>${it.type||""}${safe?" · Toca para baúl":""}</small>${actionBtns}</div>`;
  }
  const pouches=(S.inventory||[]).filter(x=>x==="pouch").length;
  const stashBtn=safe
   ?`<button class="btn small" onclick="storeSelectedFromInventory()">▣ Guardar seleccionados</button>`
   :`<button class="btn small ghost" onclick="toast('Baúl solo en zona segura')">▣ Baúl (bloqueado)</button>`;
- const body=`<div class="tabs"><button class="tab active">INVENTARIO (${used}/${S.inventoryMax})</button><button class="tab" onclick="clearStorageSelection();document.querySelector('.modal-backdrop')?.remove();openInventory(true)">BAÚL (${(S.stash||[]).length})</button></div>
+ const body=`<div class="tabs"><button class="tab active">INVENTARIO (${used}/${S.inventoryMax})</button><button class="tab" onclick="openInventory(true)">BAÚL (${(S.stash||[]).length})</button></div>
  <div class="storage-help">${safe?"Selecciona objetos y pulsa <b>GUARDAR SELECCIONADOS</b> para el baúl.":"Fuera de zona segura no puedes usar el baúl. Sí puedes combinar y ordenar."}</div>
  <div class="item-grid" style="grid-template-columns:repeat(4,1fr)">${cells}</div>
  <div class="storage-footer"><span><b id="storage-selected-count">0</b> seleccionados</span><div>
   ${stashBtn}
   <button class="btn small ghost" onclick="clearStorageSelection();openInventory(false)">Limpiar</button>
-  <button class="btn small ghost" onclick="clearStorageSelection();document.querySelector('.modal-backdrop')?.remove()">Cerrar</button>
+  <button class="btn small ghost" onclick="closeInventoryModal()">Cerrar</button>
  </div></div>
  <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">
   <button class="btn small" onclick="startCombineMode()">🔗 Combinar</button>
   <button class="btn small" onclick="startReorderMode()">↕ Ordenar</button>
   <button class="btn small ghost" onclick="cancelReorderMode()">Cancelar orden</button>
  </div>
- <p class="inventory-note" id="inv-hint">🔗 Combinar: toca dos plantas. ↕ Ordenar: toca objeto y luego la casilla destino. Base 8 · Riñoneras ${pouches}/2 · Máx 12.</p>`;
+ <p class="inventory-note" id="inv-hint">🔗 Combinar: dos plantas. ↕ Ordenar: objeto y luego casilla (también vacía). Base 8 · Riñoneras ${pouches}/2 · Máx 12.</p>`;
  openModal("INVENTARIO",body,"inv-modal");
+}
+function closeInventoryModal(){
+ cancelReorderMode();
+ window.__combineMode=false;
+ _combineSel=null;
+ clearStorageSelection();
+ closeAllModals();
 }
 window.startCombineMode=()=>{
  window.__reorderMode=false; _reorderFrom=null;
@@ -4902,6 +4964,9 @@ window.takeSelectedFromStash=takeSelectedFromStash;
 window.takeFromStash=takeFromStash;
 window.takeAllFromStash=takeAllFromStash;
 window.startReorderMode=startReorderMode;
+window.closeInventoryModal=closeInventoryModal;
+window.closeAllModals=closeAllModals;
+window.refreshInventoryModal=refreshInventoryModal;
 window.cancelReorderMode=cancelReorderMode;
 window.moveInvSlot=moveInvSlot;
 window.storeFromInventory=storeFromInventory;window.takeFromStash=takeFromStash;window.takeAllFromStash=takeAllFromStash;
