@@ -4078,68 +4078,102 @@ function isCurrentSafe(){
  return !!(sc?.safe || ["safe_shop","safe_station","safe_hospital","safe_water"].includes(S.scene));
 }
 function storeFromInventory(id,index){
- if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return}
- const it=ITEMS[id];
- if(!it)return;
+ if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return false}
+ const it=ITEMS[id]; if(!it)return false;
+ S.stash=S.stash||[];
+ let moved=0;
  if(it.type==="ammo"){
   const qty=ammoCount(id);
-  if(qty<=0){toast("No tienes esa munición");return}
-  S.stash=S.stash||[];
+  if(qty<=0){toast("No tienes esa munición");return false}
   for(let n=0;n<qty;n++)S.stash.push(id);
-  S.ammo[id]=0;
-  toast(`Baúl: guardada toda la munición de ${it.name}`);
+  S.ammo[id]=0; moved=qty;
  }else{
-  const i=S.inventory.indexOf(id,index>=0?index:0);
-  if(i<0){toast("Objeto no encontrado");return}
-  if(id==="pouch"){
-   const newCount=(S.inventory||[]).filter(x=>x!=="pouch").length;
-   const newMax=8+Math.min(2,newCount)*2;
-   if(newCount>newMax){toast("No puedes guardar esa riñonera: te dejaría el inventario lleno");uiSound("error");return}
-  }
+  const i=(S.inventory||[]).indexOf(id);
+  if(i<0){toast("Objeto no encontrado");return false}
   S.inventory.splice(i,1);
-  if(S.flags.equipped===id)S.flags.equipped=null;
-  recomputeInventoryMax();
-  toast(`Baúl: ${it.name} guardado`);
+  if(S.flags.equipped===id) S.flags.equipped=null;
+  moved=1;
  }
+ recomputeInventoryMax();
  persist();
- document.querySelector(".modal-backdrop")?.remove();
- openInventory(false);
+ toast(`Baúl: ${it.name}${it.type==="ammo"?` ×${moved}`:" guardado"}`);
+ return true;
 }
-function takeFromStash(id,index){
+function storeAllFromInventory(){
  if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return}
- const it=ITEMS[id];
- if(!it)return;
  S.stash=S.stash||[];
- const i=index>=0?index:S.stash.indexOf(id);
- if(i<0){toast("Objeto no encontrado en el baúl");return}
- if(it.type==="ammo"){
-  const cur=ammoCount(id), max=it.stack||60;
-  if(cur>=max){toast(`${it.name}: al máximo (${max})`);uiSound("error");return}
-  if(cur===0 && slotCount()>=S.inventoryMax){toast("Inventario lleno");uiSound("error");return}
-  S.ammo[id]=cur+1;
-  S.stash.splice(i,1);
-  toast(`Sacado del baúl: ${it.name} (${S.ammo[id]}/${max})`);
- }else{
-  if(slotCount()>=S.inventoryMax){toast("Inventario lleno");uiSound("error");return}
-  S.stash.splice(i,1);
-  S.inventory.push(id);
-  if(id==="pouch")recomputeInventoryMax();
-  toast(`Sacado del baúl: ${it.name}`);
+ const items=[...(S.inventory||[])];
+ const ammoIds=["ammo9","shells","ammoSmg"];
+ let moved=0;
+ // Store every physical inventory item, including weapons. Documents are never here.
+ for(const id of items){
+  if(!ITEMS[id] || ITEMS[id].type==="ammo") continue;
+  const i=S.inventory.indexOf(id);
+  if(i<0) continue;
+  S.inventory.splice(i,1);
+  S.stash.push(id);
+  if(S.flags.equipped===id) S.flags.equipped=null;
+  moved++;
  }
+ // Store all ammunition in one operation per ammo type.
+ for(const id of ammoIds){
+  const qty=ammoCount(id);
+  if(qty>0){ for(let n=0;n<qty;n++)S.stash.push(id); S.ammo[id]=0; moved+=qty; }
+ }
+ recomputeInventoryMax();
  persist();
  document.querySelector(".modal-backdrop")?.remove();
  openInventory(true);
+ toast(moved?`Baúl: ${moved} unidades guardadas`:`No hay objetos para guardar`);
+}
+function takeFromStash(id,index){
+ if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return false}
+ const it=ITEMS[id]; if(!it)return false;
+ S.stash=S.stash||[];
+ const i=index>=0?index:S.stash.indexOf(id);
+ if(i<0){toast("Objeto no encontrado en el baúl");return false}
+ if(it.type==="ammo"){
+  const cur=ammoCount(id), max=it.stack||60;
+  if(cur>=max){toast(`${it.name}: al máximo (${max})`);uiSound("error");return false}
+  if(cur===0 && slotCount()>=S.inventoryMax){toast("Inventario lleno");uiSound("error");return false}
+  S.ammo[id]=cur+1;
+  S.stash.splice(i,1);
+ }else{
+  if(slotCount()>=S.inventoryMax){toast("Inventario lleno");uiSound("error");return false}
+  S.stash.splice(i,1);
+  S.inventory.push(id);
+  if(id==="pouch")recomputeInventoryMax();
+ }
+ persist();
+ return true;
 }
 function takeAllFromStash(){
  if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return}
  let moved=0;
- const snapshot=[...(S.stash||[])];
- for(const id of snapshot){
-  const before=S.stash.length;
-  takeFromStash(id,S.stash.indexOf(id));
-  if(S.stash.length<before)moved++;
+ // Do not call takeFromStash's UI refresh in a loop: move everything atomically.
+ while((S.stash||[]).length && slotCount()<S.inventoryMax){
+  const id=S.stash[0], it=ITEMS[id];
+  if(!it){S.stash.shift();continue}
+  if(it.type==="ammo"){
+   const max=it.stack||60, cur=ammoCount(id);
+   if(cur>=max || (cur===0 && slotCount()>=S.inventoryMax)){
+    // Skip this ammo type and look for another storable item.
+    const j=S.stash.findIndex(x=>x!==id && ITEMS[x] && ITEMS[x].type!=="ammo");
+    if(j<0) break;
+    S.stash.push(S.stash.splice(j,1)[0]);
+    continue;
+   }
+   S.ammo[id]=cur+1; S.stash.shift(); moved++;
+  }else{
+   S.inventory.push(S.stash.shift());
+   moved++;
+   if(id==="pouch")recomputeInventoryMax();
+  }
  }
- toast(moved?`Sacados ${moved} objetos del baúl`:`No hay espacio para sacar más objetos`);
+ persist();
+ document.querySelector(".modal-backdrop")?.remove();
+ openInventory(true);
+ toast(moved?`Sacados ${moved} objetos del baúl`:`No hay espacio o no se puede sacar más`);
 }
 function openInventory(stash=false){
  _combineSel=null;
@@ -4154,7 +4188,7 @@ function openInventory(stash=false){
   const grouped=Object.entries(counts);
   const body=`<div class="tabs"><button class="tab" onclick="this.closest('.modal-backdrop').remove();openInventory(false)">INVENTARIO (${slotCount()}/${S.inventoryMax})</button><button class="tab active">BAÚL (${arr.length})</button></div>
   <div class="item-grid">${grouped.length?grouped.map(([id,qty])=>{const it=ITEMS[id]||{};const idx=arr.indexOf(id);return `<div class="item"><div class="ico">${it.ico||"?"}</div><b>${esc(it.name||id)}</b><span class="qty">×${qty}</span><small>Baúl · guardar para después</small><div class="slot-actions"><button type="button" onclick="takeFromStash('${id}',${idx})">Sacar 1</button>${qty>1?`<button type="button" onclick="for(let n=0;n<${qty};n++){if(!S.stash.includes('${id}'))break;takeFromStash('${id}',S.stash.indexOf('${id}'));}">Sacar todo</button>`:""}</div></div>`}).join(""):`<div class="empty" style="grid-column:1/-1">Baúl vacío</div>`}</div>
-  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn small" onclick="this.closest('.modal-backdrop').remove();openInventory(false)">▣ Guardar objetos</button><button class="btn small ghost" onclick="document.querySelector('.modal-backdrop')?.remove()">Cerrar</button></div>
+  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn small" onclick="this.closest('.modal-backdrop').remove();openInventory(false)">▣ Guardar objetos</button><button class="btn small" onclick="takeAllFromStash()">▣ Sacar todo</button><button class="btn small ghost" onclick="document.querySelector('.modal-backdrop')?.remove()">Cerrar</button></div>
   <p class="inventory-note">El baúl no tiene límite y conserva los objetos entre sesiones. Solo accesible en zonas seguras.</p>`;
   openModal("BAÚL",body,"inv-modal");
   return;
@@ -4201,6 +4235,7 @@ function openInventory(stash=false){
  <div class="item-grid" style="grid-template-columns:repeat(4,1fr)">${cells}</div>
  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
   <button class="btn small" onclick="startCombineMode()">🔗 Combinar</button>
+  ${isCurrentSafe()?`<button class="btn small" onclick="storeAllFromInventory()">▣ Guardar todo</button>`:""}
   <button class="btn small ghost" onclick="document.querySelector('.modal-backdrop')?.remove()">Cerrar</button>
  </div>
  <p class="inventory-note" id="inv-hint">Usa ◀ ▶ para reordenar. Base 8 huecos · Riñoneras: ${pouches}/2 (+${pouches*2} espacios) · Máx 12. Munición apilada no gasta huecos extra.</p>`;
@@ -4414,6 +4449,7 @@ function openMissions(){
  openModal("MISIONES",body,"inv-modal");
 }
 function openDocument(id){
+ window.__openDocumentId=id;
  const d=DOCS[id];
  if(!d || !S.docs.includes(id)){toast("Documento no disponible");return}
  const body=`<article class="doc-viewer">
@@ -4421,10 +4457,11 @@ function openDocument(id){
   <p class="doc-viewer-body">${esc(d.body)}</p>
   <div class="doc-footnote">Este documento pertenece al archivo de investigación de Raccoon Nightfall Files. Los documentos se almacenan automáticamente en ARCHIVO y no ocupan espacio del inventario ni del baúl.</div>
  </article>
- <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn ghost" onclick="document.querySelector('.modal-backdrop')?.remove();openDocs()">← Volver al archivo</button><button class="btn" onclick="document.querySelector('.modal-backdrop')?.remove()">Cerrar</button></div>`;
+ <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn ghost" onclick="document.querySelector('.modal-backdrop')?.remove();openDocs()">← Volver al archivo</button><button class="btn" onclick="window.__openDocumentId=null;document.querySelector('.modal-backdrop')?.remove()">Cerrar</button></div>`;
  openModal("DOCUMENTO",body,"inv-modal");
 }
 function openDocs(){
+ window.__openDocumentId=null;
  const docs=S.docs.filter(id=>DOCS[id]);
  const body=docs.length?`<div class="docs-toolbar"><div><div class="eyebrow" style="margin:0 0 3px">ARCHIVO DE INVESTIGACIÓN</div><div class="docs-count"><b>${docs.length}</b> documento${docs.length===1?"":"s"} descubierto${docs.length===1?"":"s"}</div></div><div style="font-size:22px">▤</div></div>
   <div class="docs-list">${docs.map((id,i)=>{const d=DOCS[id];const preview=(d.body||"").replace(/\s+/g," ").trim();return `<article class="doc-card"><div class="doc-icon">▤</div><div><h3>${esc(d.title)}</h3><div class="doc-meta">${esc(d.meta||"ARCHIVO LOCAL")}<span class="doc-type">REGISTRO ${String(i+1).padStart(2,"0")}</span></div><p class="doc-preview">${esc(preview)}</p></div><button class="btn small doc-read" onclick="openDocument('${id}')">LEER</button></article>`}).join("")}</div>
