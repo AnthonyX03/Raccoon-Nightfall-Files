@@ -4024,19 +4024,25 @@ function useItem(id){
  persist();renderGame();
 }
 function combine(a,b){
- if(!a||!b||a===b&&a==="herbG"){
-  if(a==="herbG"&&b==="herbG"&&S.inventory.filter(x=>x==="herbG").length>=2){
-   removeItem("herbG");removeItem("herbG");addItem("herbG");S.flags.mixedGreen=true;toast("Mezcla verde: curación reforzada");return
+ if(!a||!b){toast("Elige dos objetos");return}
+ if(a===b){
+  if(a==="herbG"&&S.inventory.filter(x=>x==="herbG").length>=2){
+   removeItem("herbG");removeItem("herbG");
+   // enhanced green stays as herbG with flag
+   if(slotCount()<S.inventoryMax) S.inventory.push("herbG");
+   S.flags.mixedGreen=true; S.invOrder=null;
+   toast("Mezcla verde: curación reforzada (+flag)");persist();return;
   }
-  toast("Esa combinación no produce nada");return
+  toast("Necesitas dos unidades del mismo objeto");return;
  }
  const pair=[a,b].sort().join("+");
  const recipes={
-  "herbG+herbR":()=>{removeItem("herbG");removeItem("herbR");addItem("herbR");S.flags.fullHeal=true},
-  "herbB+herbG":()=>{removeItem("herbB");removeItem("herbG");addItem("herbB");S.flags.antidote=true},
-  "herbB+herbR":()=>{removeItem("herbB");removeItem("herbR");addItem("spray");S.flags.specialMix=true}
+  "herbG+herbR":()=>{removeItem("herbG");removeItem("herbR");if(slotCount()<S.inventoryMax)S.inventory.push("herbR");S.flags.fullHeal=true;toast("Mezcla GR: curación fuerte")},
+  "herbB+herbG":()=>{removeItem("herbB");removeItem("herbG");if(slotCount()<S.inventoryMax)S.inventory.push("herbB");S.flags.antidote=true;toast("Mezcla BG: antídoto potenciado")},
+  "herbB+herbR":()=>{removeItem("herbB");removeItem("herbR");if(slotCount()<S.inventoryMax)S.inventory.push("spray");S.flags.specialMix=true;toast("Mezcla BR → Spray de primeros auxilios")}
  };
- if(recipes[pair]){recipes[pair]();toast("Combinación realizada");persist();renderGame()}else toast("No puedes combinar esos objetos");
+ if(recipes[pair]){recipes[pair]();S.invOrder=null;persist();}
+ else toast("No puedes combinar esos objetos");
 }
 function openModal(title,body,extraClass=""){
  const m=document.createElement("div");m.className="modal-backdrop";
@@ -4117,144 +4123,291 @@ function isCurrentSafe(){
  return !!(sc?.safe || ["safe_shop","safe_station","safe_hospital","safe_water"].includes(S.scene));
 }
 let _storageSelection=new Set();
-function clearStorageSelection(){_storageSelection=new Set();}
+let _reorderFrom=null;
+function clearStorageSelection(){
+ _storageSelection=new Set();
+ const n=document.getElementById("storage-selected-count");
+ if(n)n.textContent="0";
+ document.querySelectorAll(".storage-card.selected,.item.selected-reorder").forEach(el=>el.classList.remove("selected","selected-reorder"));
+}
 function toggleStorageSelection(key,el){
-  if(window.__combineMode){
-    const id=key.startsWith('invslot:') ? (buildSlotList()[Number(key.slice(8))]?.id) : (key.startsWith('ammo:')?key.slice(5):null);
-    if(!id){toast('Ese elemento no se puede combinar');return}
-    if(!_combineSel){_combineSel=id;const hint=document.getElementById('inv-hint');if(hint)hint.textContent=`Primer objeto: ${ITEMS[id]?.name||id}. Elige el SEGUNDO...`;toast(`Seleccionado: ${ITEMS[id]?.name||id}`);return}
-    const a=_combineSel,b=id;window.__combineMode=false;_combineSel=null;combine(a,b);document.querySelector('.modal-backdrop')?.remove();openInventory(false);return;
+ // Combine mode intercept
+ if(window.__combineMode){
+  let id=null;
+  if(key.startsWith("invslot:")){
+   const s=buildSlotList()[Number(key.slice(8))];
+   id=s?s.id:null;
+  }else if(key.startsWith("ammo:")) id=key.slice(5);
+  else if(key.startsWith("stash:")) id=key.slice(6);
+  if(!id||!ITEMS[id]){toast("Ese elemento no se puede combinar");return}
+  if(ITEMS[id].type==="ammo"||ITEMS[id].type==="weapon"){toast("No se puede combinar este tipo");return}
+  if(!_combineSel){
+   _combineSel=id;
+   const hint=document.getElementById("inv-hint");
+   if(hint)hint.textContent=`Primer objeto: ${ITEMS[id]?.name||id}. Elige el SEGUNDO...`;
+   toast(`Seleccionado: ${ITEMS[id]?.name||id}`);
+   el?.classList.add("selected");
+   return;
   }
-  if(_storageSelection.has(key)){_storageSelection.delete(key);el?.classList.remove('selected');}
-  else {_storageSelection.add(key);el?.classList.add('selected');}
-  const n=document.getElementById('storage-selected-count'); if(n)n.textContent=_storageSelection.size;
-  uiSound('choice');
+  const a=_combineSel,b=id;
+  window.__combineMode=false;_combineSel=null;
+  combine(a,b);
+  document.querySelector(".modal-backdrop")?.remove();
+  openInventory(false);
+  return;
+ }
+ // Reorder mode intercept
+ if(window.__reorderMode){
+  handleReorderClick(key,el);
+  return;
+ }
+ if(_storageSelection.has(key)){_storageSelection.delete(key);el?.classList.remove("selected");}
+ else {_storageSelection.add(key);el?.classList.add("selected");}
+ const n=document.getElementById("storage-selected-count"); if(n)n.textContent=_storageSelection.size;
+ uiSound("choice");
 }
 function storageSelectionCount(){return _storageSelection.size}
+function inventoryIndexForSlot(slotIndex){
+ const slots=buildSlotList(); const s=slots[slotIndex]; if(!s||s.kind!=="item")return -1;
+ let occurrence=0; for(let i=0;i<slotIndex;i++) if(slots[i].kind==="item"&&slots[i].id===s.id) occurrence++;
+ let seen=0; for(let i=0;i<(S.inventory||[]).length;i++){ if(S.inventory[i]===s.id){ if(seen===occurrence)return i; seen++; }}
+ return -1;
+}
 function storeFromInventory(id,index){
  if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return false}
  clearStorageSelection();
- if(index<0 && ITEMS[id]?.type==='ammo') _storageSelection.add('ammo:'+id);
- else if(index>=0) _storageSelection.add('invslot:'+index);
+ if(index<0 && ITEMS[id]?.type==="ammo") _storageSelection.add("ammo:"+id);
+ else if(index>=0) _storageSelection.add("invslot:"+index);
  return storeSelectedFromInventory();
-}
-function inventoryIndexForSlot(slotIndex){
- const slots=buildSlotList(); const s=slots[slotIndex]; if(!s||s.kind!=='item')return -1;
- let occurrence=0; for(let i=0;i<slotIndex;i++) if(slots[i].kind==='item'&&slots[i].id===s.id) occurrence++;
- let seen=0; for(let i=0;i<(S.inventory||[]).length;i++){ if(S.inventory[i]===s.id){ if(seen===occurrence)return i; seen++; }}
- return -1;
 }
 function storeSelectedFromInventory(){
  if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return}
  S.stash=S.stash||[];
  let moved=0;
- const ammoKeys=[..._storageSelection].filter(k=>k.startsWith('ammo:'));
+ const ammoKeys=[..._storageSelection].filter(k=>k.startsWith("ammo:"));
  for(const key of ammoKeys){
-   const id=key.slice(5), it=ITEMS[id], qty=ammoCount(id);
-   if(!it||it.type!=='ammo'||qty<=0)continue;
-   for(let n=0;n<qty;n++)S.stash.push(id);
-   S.ammo[id]=0; moved+=qty;
+  const id=key.slice(5), it=ITEMS[id], qty=ammoCount(id);
+  if(!it||it.type!=="ammo"||qty<=0)continue;
+  for(let n=0;n<qty;n++) S.stash.push(id);
+  S.ammo[id]=0; moved+=qty;
  }
- const indices=[..._storageSelection].filter(k=>k.startsWith('invslot:')).map(k=>inventoryIndexForSlot(Number(k.slice(8)))).filter(i=>i>=0).sort((a,b)=>b-a);
+ const indices=[..._storageSelection].filter(k=>k.startsWith("invslot:")).map(k=>inventoryIndexForSlot(Number(k.slice(8)))).filter(i=>i>=0).sort((a,b)=>b-a);
  for(const idx of indices){
-   const id=S.inventory?.[idx], it=ITEMS[id];
-   if(!id||!it||it.type==='ammo')continue;
-   S.inventory.splice(idx,1); S.stash.push(id); moved++;
-   if(S.flags.equipped===id)S.flags.equipped=null;
+  const id=S.inventory?.[idx], it=ITEMS[id];
+  if(!id||!it||it.type==="ammo")continue;
+  S.inventory.splice(idx,1); S.stash.push(id); moved++;
+  if(S.flags.equipped===id) S.flags.equipped=null;
  }
+ // rebuild invOrder
+ S.invOrder=null;
  clearStorageSelection(); recomputeInventoryMax(); persist();
  openInventory(true);
- toast(moved?`Baúl: ${moved} unidades guardadas`:'No se seleccionó ningún objeto');
+ toast(moved?`Baúl: ${moved} unidades guardadas`:"No se seleccionó ningún objeto");
 }
 function storeAllFromInventory(){
  if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return}
- // Kept as a convenience command, but the main UI now uses selection mode.
  S.stash=S.stash||[]; let moved=0;
- for(const id of [...(S.inventory||[])]){const it=ITEMS[id];if(!it||it.type==='ammo')continue;S.stash.push(id);if(S.flags.equipped===id)S.flags.equipped=null;moved++;}
+ for(const id of [...(S.inventory||[])]){const it=ITEMS[id];if(!it||it.type==="ammo")continue;S.stash.push(id);if(S.flags.equipped===id)S.flags.equipped=null;moved++;}
  S.inventory=[];
- for(const id of ['ammo9','shells','ammoSmg']){const qty=ammoCount(id);if(qty>0){for(let n=0;n<qty;n++)S.stash.push(id);S.ammo[id]=0;moved+=qty;}}
- clearStorageSelection(); recomputeInventoryMax(); persist(); openInventory(true); toast(moved?`Baúl: ${moved} unidades guardadas`:'No hay objetos para guardar');
+ for(const id of ["ammo9","shells","ammoSmg"]){const qty=ammoCount(id);if(qty>0){for(let n=0;n<qty;n++)S.stash.push(id);S.ammo[id]=0;moved+=qty;}}
+ S.invOrder=null;
+ clearStorageSelection(); recomputeInventoryMax(); persist(); openInventory(true); toast(moved?`Baúl: ${moved} unidades guardadas`:"No hay objetos para guardar");
 }
 function takeFromStash(id,index){
  if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return false}
- clearStorageSelection(); _storageSelection.add('stash:'+id); return takeSelectedFromStash();
+ clearStorageSelection(); _storageSelection.add("stash:"+id); return takeSelectedFromStash();
 }
 function takeSelectedFromStash(){
  if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return}
  S.stash=S.stash||[]; let moved=0;
- const ids=[..._storageSelection].filter(k=>k.startsWith('stash:')).map(k=>k.slice(6));
+ const ids=[..._storageSelection].filter(k=>k.startsWith("stash:")).map(k=>k.slice(6));
  for(const id of ids){
-   const it=ITEMS[id]; if(!it)continue;
-   if(it.type==='ammo'){
-     const cur=ammoCount(id), max=it.stack||60;
-     if(cur>=max)continue;
-     const free=cur===0 ? Math.max(0,S.inventoryMax-slotCount()) : 0;
-     const capacity=cur>0 ? max-cur : Math.min(max-cur,free);
-     const available=S.stash.filter(x=>x===id).length;
-     const take=Math.min(available,capacity);
-     for(let n=0;n<take;n++){const i=S.stash.indexOf(id);if(i<0)break;S.stash.splice(i,1);}
-     if(take){S.ammo[id]=cur+take;moved+=take;}
-   }else{
-     while(S.stash.includes(id) && slotCount()<S.inventoryMax){
-       const i=S.stash.indexOf(id);S.stash.splice(i,1);S.inventory.push(id);moved++;if(id==='pouch')recomputeInventoryMax();
-     }
+  const it=ITEMS[id]; if(!it)continue;
+  if(it.type==="ammo"){
+   const max=it.stack||60; const cur=ammoCount(id);
+   let available=S.stash.filter(x=>x===id).length;
+   let room=max-cur;
+   // need a free inventory slot if this ammo type is not yet carried
+   if(cur===0 && slotCount()>=S.inventoryMax){toast("Inventario lleno");continue}
+   let take=Math.min(available,room);
+   if(take<=0)continue;
+   for(let n=0;n<take;n++){
+    const i=S.stash.indexOf(id); if(i<0)break;
+    S.stash.splice(i,1);
    }
+   S.ammo[id]=cur+take; moved+=take;
+  }else{
+   while(S.stash.includes(id) && slotCount()<S.inventoryMax){
+    const i=S.stash.indexOf(id); S.stash.splice(i,1); S.inventory.push(id); moved++;
+    if(id==="pouch") recomputeInventoryMax();
+   }
+  }
  }
- clearStorageSelection(); persist(); openInventory(true); toast(moved?`Sacados ${moved} objetos del baúl`:'No se pudo sacar lo seleccionado');
+ S.invOrder=null;
+ clearStorageSelection(); persist(); openInventory(true); toast(moved?`Sacados ${moved} objetos del baúl`:"No se pudo sacar lo seleccionado");
 }
 function takeAllFromStash(){
  if(!isCurrentSafe()){toast("Solo puedes usar el baúl en una zona segura");uiSound("error");return}
- const ids=[...new Set(S.stash||[])]; clearStorageSelection(); ids.forEach(id=>_storageSelection.add('stash:'+id)); takeSelectedFromStash();
+ const ids=[...new Set(S.stash||[])]; clearStorageSelection(); ids.forEach(id=>_storageSelection.add("stash:"+id)); takeSelectedFromStash();
 }
+
+/* ---- Reorder system ---- */
+function startReorderMode(){
+ window.__combineMode=false; _combineSel=null;
+ window.__reorderMode=true; _reorderFrom=null;
+ clearStorageSelection();
+ const hint=document.getElementById("inv-hint");
+ if(hint)hint.textContent="Modo ordenar: toca un objeto y luego la casilla destino.";
+ toast("Ordenar: elige objeto → casilla destino");
+ // refresh highlight classes
+ document.querySelectorAll(".storage-card,.empty-slot").forEach(el=>el.classList.add("reorder-ready"));
+}
+function cancelReorderMode(){
+ window.__reorderMode=false; _reorderFrom=null;
+ document.querySelectorAll(".selected-reorder,.reorder-ready").forEach(el=>el.classList.remove("selected-reorder","reorder-ready"));
+ const hint=document.getElementById("inv-hint");
+ if(hint)hint.textContent="Selecciona objetos para el baúl o usa Combinar / Ordenar.";
+}
+function handleReorderClick(key,el){
+ // key: invslot:N or empty:N or ammo:id
+ let toIndex=null;
+ if(key.startsWith("invslot:")) toIndex=Number(key.slice(8));
+ else if(key.startsWith("empty:")) toIndex=Number(key.slice(6));
+ else if(key.startsWith("ammo:")){
+  // find ammo slot index in buildSlotList
+  const slots=buildSlotList();
+  toIndex=slots.findIndex(s=>s.kind==="ammo"&&s.id===key.slice(5));
+  if(toIndex<0){toast("No encontrado");return}
+ }else{toast("Casilla no válida");return}
+
+ if(_reorderFrom===null){
+  // Must pick a filled slot
+  const slots=buildSlotList();
+  if(toIndex>=slots.length||!slots[toIndex]){toast("Elige primero un objeto ocupado");return}
+  _reorderFrom=toIndex;
+  document.querySelectorAll(".selected-reorder").forEach(e=>e.classList.remove("selected-reorder"));
+  el?.classList.add("selected-reorder");
+  const hint=document.getElementById("inv-hint");
+  if(hint)hint.textContent=`Objeto en casilla ${toIndex+1} seleccionado. Toca la casilla destino.`;
+  toast(`Origen: casilla ${toIndex+1}`);
+  uiSound("choice");
+  return;
+ }
+ // Move / swap within invOrder
+ const from=_reorderFrom;
+ if(from===toIndex){ cancelReorderMode(); openInventory(false); return; }
+ const slots=buildSlotList();
+ // Ensure invOrder has length inventoryMax with nulls for empty
+ let order=slots.map(s=>({kind:s.kind,id:s.id}));
+ while(order.length<S.inventoryMax) order.push(null);
+ // clamp to
+ if(toIndex<0) toIndex=0;
+ if(toIndex>=S.inventoryMax) toIndex=S.inventoryMax-1;
+ const item=order[from];
+ if(!item){ cancelReorderMode(); openInventory(false); return; }
+ // remove from origin
+ order.splice(from,1);
+ // insert at destination (adjust index if we removed before dest)
+ let dest=toIndex;
+ if(from<toIndex) dest=toIndex-1;
+ order.splice(dest,0,item);
+ // strip trailing nulls but keep structure
+ S.invOrder=order.filter(Boolean);
+ _reorderFrom=null;
+ window.__reorderMode=false;
+ persist();
+ uiSound("choice");
+ toast(`Movido a casilla ${dest+1}`);
+ openInventory(false);
+}
+function moveInvSlot(i,dir){
+ // Legacy support: still works if called
+ const slots=buildSlotList();
+ const j=i+dir;
+ if(j<0||j>=Math.max(slots.length,S.inventoryMax)) return;
+ let order=slots.map(s=>({kind:s.kind,id:s.id}));
+ while(order.length<S.inventoryMax) order.push(null);
+ if(!order[i]) return;
+ const tmp=order[i]; order[i]=order[j]; order[j]=tmp;
+ S.invOrder=order.filter(Boolean);
+ persist();
+ openInventory(false);
+}
+
 function openInventory(stash=false){
  _combineSel=null;
  window.__combineMode=false;
  window.__reorderMode=false;
+ _reorderFrom=null;
+ clearStorageSelection();
  recomputeInventoryMax();
+ const safe=isCurrentSafe();
  if(stash){
-  if(!isCurrentSafe()){toast("El baúl solo está disponible en zonas seguras");return}
+  if(!safe){toast("El baúl solo está disponible en zonas seguras");return}
   const arr=S.stash||[]; const counts={}; for(const id of arr)counts[id]=(counts[id]||0)+1;
   const grouped=Object.entries(counts);
-  const body=`<div class="tabs"><button class="tab" onclick="clearStorageSelection();this.closest('.modal-backdrop').remove();openInventory(false)">INVENTARIO (${slotCount()}/${S.inventoryMax})</button><button class="tab active">BAÚL (${arr.length})</button></div>
-  <div class="storage-help">Selecciona uno o varios objetos y pulsa <b>SACAR SELECCIONADOS</b>. Puedes seleccionar varias clases a la vez.</div>
-  <div class="item-grid">${grouped.length?grouped.map(([id,qty])=>{const it=ITEMS[id]||{};return `<div class="item storage-card" onclick="toggleStorageSelection('stash:${id}',this)"><div class="ico">${it.ico||"?"}</div><b>${esc(it.name||id)}</b><span class="qty">×${qty}</span><small>Seleccionar para sacar</small></div>`}).join(""):`<div class="empty" style="grid-column:1/-1">Baúl vacío</div>`}</div>
-  <div class="storage-footer"><span><b id="storage-selected-count">0</b> seleccionados</span><div><button class="btn small" onclick="takeSelectedFromStash()">▣ Sacar seleccionados</button><button class="btn small ghost" onclick="clearStorageSelection();openInventory(true)">Limpiar</button><button class="btn small ghost" onclick="clearStorageSelection();document.querySelector('.modal-backdrop')?.remove()">Cerrar</button></div></div>
-  <p class="inventory-note">Seleccionar una munición saca la cantidad que pueda entrar en su pila. Las armas y objetos se recuperan individualmente.</p>`;
+  const body=`<div class="tabs"><button class="tab" onclick="clearStorageSelection();document.querySelector('.modal-backdrop')?.remove();openInventory(false)">INVENTARIO (${slotCount()}/${S.inventoryMax})</button><button class="tab active">BAÚL (${arr.length})</button></div>
+  <div class="storage-help">Selecciona objetos y pulsa <b>SACAR SELECCIONADOS</b>.</div>
+  <div class="item-grid">${grouped.length?grouped.map(([id,qty])=>{const it=ITEMS[id]||{};return `<div class="item storage-card" onclick="toggleStorageSelection('stash:${id}',this)"><div class="ico">${it.ico||"?"}</div><b>${esc(it.name||id)}</b><span class="qty">×${qty}</span><small>Toca para seleccionar</small></div>`}).join(""):`<div class="empty" style="grid-column:1/-1">Baúl vacío</div>`}</div>
+  <div class="storage-footer"><span><b id="storage-selected-count">0</b> seleccionados</span><div>
+   <button class="btn small" onclick="takeSelectedFromStash()">▣ Sacar seleccionados</button>
+   <button class="btn small ghost" onclick="takeAllFromStash()">Sacar todo</button>
+   <button class="btn small ghost" onclick="clearStorageSelection();openInventory(true)">Limpiar</button>
+   <button class="btn small ghost" onclick="clearStorageSelection();document.querySelector('.modal-backdrop')?.remove()">Cerrar</button>
+  </div></div>
+  <p class="inventory-note">La munición se apila al sacarla. Si no hay espacio, solo se saca lo que quepa.</p>`;
   openModal("BAÚL",body,"inv-modal"); return;
  }
  const slots=buildSlotList(); const used=slots.length; let cells="";
  for(let i=0;i<S.inventoryMax;i++){
-  const s=slots[i]; if(!s){cells+=`<div class="item empty-slot"><div class="ico" style="opacity:.2">·</div><b style="opacity:.3">Vacío</b><small>${i+1}/${S.inventoryMax}</small></div>`;continue;}
-  const moveBtns=`<div class="slot-actions"><button type="button" onclick="event.stopPropagation();moveInvSlot(${i},-1)" title="Izquierda">◀</button><button type="button" onclick="event.stopPropagation();moveInvSlot(${i},1)" title="Derecha">▶</button></div>`;
-  const selectKey=s.kind==='ammo'?'ammo:'+s.id:'invslot:'+i;
-  if(s.kind==='ammo'){
-   const it=ITEMS[s.id];
-   cells+=`<div class="item storage-card" onclick="toggleStorageSelection('${selectKey}',this)"><div class="ico">${it.ico}</div><b>${esc(it.name)}</b><span class="qty">×${s.qty}</span><small>Máx ${it.stack} · Seleccionar para guardar</small>${moveBtns}</div>`;
-  }else{
-   const it=ITEMS[s.id]||{name:s.id,ico:"?"}; const eq=(it.type==='weapon'&&S.flags.equipped===s.id)?` <span class="qty">E</span>`:"";
-   const idx=(S.inventory||[]).indexOf(s.id); let actionBtns="";
-   if(it.type==='weapon')actionBtns=`<div class="slot-actions"><button type="button" class="act-equip" onclick="event.stopPropagation();equipItem('${s.id}')">${S.flags.equipped===s.id?'Equipada ✓':'Equipar'}</button></div>`;
-   else if(it.type==='heal')actionBtns=`<div class="slot-actions"><button type="button" class="act-use" onclick="event.stopPropagation();useInvItem('${s.id}',${idx})">Usar</button></div>`;
-   else if(it.type==='tool')actionBtns=`<div class="slot-actions"><button type="button" class="act-use" onclick="event.stopPropagation();useInvItem('${s.id}',${idx})">Usar</button></div>`;
-   else if(it.type==='expand')actionBtns=`<div class="slot-actions"><button type="button" onclick="event.stopPropagation();useInvItem('${s.id}',${idx})">Info +2</button></div>`;
-   else actionBtns=`<div class="slot-actions"><button type="button" onclick="event.stopPropagation();itemAction('${s.id}',${idx},false)">Info</button></div>`;
-   cells+=`<div class="item storage-card" onclick="toggleStorageSelection('${selectKey}',this)"><div class="ico">${it.ico||"?"}</div><b>${esc(it.name)}</b>${eq}<small>${it.type||""} · Seleccionar para guardar</small>${actionBtns}${moveBtns}</div>`;
+  const s=slots[i];
+  if(!s){
+   cells+=`<div class="item empty-slot" onclick="toggleStorageSelection('empty:${i}',this)"><div class="ico" style="opacity:.2">·</div><b style="opacity:.3">Vacío</b><small>${i+1}/${S.inventoryMax}</small></div>`;
+   continue;
   }
+  const it=ITEMS[s.id]||{name:s.id,ico:"?",type:"?"};
+  const idx=s.kind==="item"?inventoryIndexForSlot(i):-1;
+  const selectKey=s.kind==="ammo"?("ammo:"+s.id):("invslot:"+i);
+  const eq=(s.kind==="item"&&S.flags.equipped===s.id)?` <span class="eq-tag">E</span>`:"";
+  const qty=(s.kind==="ammo")?`<span class="qty">×${s.qty||ammoCount(s.id)}</span>`:"";
+  let actionBtns="";
+  if(s.kind==="item"){
+   if(it.type==="weapon") actionBtns=`<div class="slot-actions"><button type="button" class="act-use" onclick="event.stopPropagation();equipItem('${s.id}')">Equipar</button></div>`;
+   else if(it.type==="heal") actionBtns=`<div class="slot-actions"><button type="button" class="act-use" onclick="event.stopPropagation();useInvItem('${s.id}',${idx})">Usar</button></div>`;
+   else if(it.type==="tool") actionBtns=`<div class="slot-actions"><button type="button" class="act-use" onclick="event.stopPropagation();useInvItem('${s.id}',${idx})">Usar</button></div>`;
+   else if(it.type==="expand") actionBtns=`<div class="slot-actions"><button type="button" onclick="event.stopPropagation();useInvItem('${s.id}',${idx})">Info +2</button></div>`;
+   else actionBtns=`<div class="slot-actions"><button type="button" onclick="event.stopPropagation();itemAction('${s.id}',${idx},false)">Info</button></div>`;
+  }
+  cells+=`<div class="item storage-card" onclick="toggleStorageSelection('${selectKey}',this)"><div class="ico">${it.ico||"?"}</div><b>${esc(it.name)}</b>${eq}${qty}<small>${it.type||""}${safe?" · Toca para baúl":""}</small>${actionBtns}</div>`;
  }
- const pouches=(S.inventory||[]).filter(x=>x==='pouch').length;
- const body=`<div class="tabs"><button class="tab active">INVENTARIO (${used}/${S.inventoryMax})</button><button class="tab" onclick="clearStorageSelection();this.closest('.modal-backdrop').remove();openInventory(true)">BAÚL (${(S.stash||[]).length})</button></div>
- <div class="storage-help">Selecciona uno o varios objetos y pulsa <b>GUARDAR SELECCIONADOS</b>. Las armas se guardan sin desaparecer; si está equipada, se desequipa automáticamente.</div>
+ const pouches=(S.inventory||[]).filter(x=>x==="pouch").length;
+ const stashBtn=safe
+  ?`<button class="btn small" onclick="storeSelectedFromInventory()">▣ Guardar seleccionados</button>`
+  :`<button class="btn small ghost" onclick="toast('Baúl solo en zona segura')">▣ Baúl (bloqueado)</button>`;
+ const body=`<div class="tabs"><button class="tab active">INVENTARIO (${used}/${S.inventoryMax})</button><button class="tab" onclick="clearStorageSelection();document.querySelector('.modal-backdrop')?.remove();openInventory(true)">BAÚL (${(S.stash||[]).length})</button></div>
+ <div class="storage-help">${safe?"Selecciona objetos y pulsa <b>GUARDAR SELECCIONADOS</b> para el baúl.":"Fuera de zona segura no puedes usar el baúl. Sí puedes combinar y ordenar."}</div>
  <div class="item-grid" style="grid-template-columns:repeat(4,1fr)">${cells}</div>
- <div class="storage-footer"><span><b id="storage-selected-count">0</b> seleccionados</span><div><button class="btn small" onclick="storeSelectedFromInventory()">▣ Guardar seleccionados</button><button class="btn small ghost" onclick="clearStorageSelection();openInventory(false)">Limpiar</button><button class="btn small ghost" onclick="clearStorageSelection();document.querySelector('.modal-backdrop')?.remove()">Cerrar</button></div></div>
- <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px"><button class="btn small" onclick="startCombineMode()">🔗 Combinar</button></div><p class="inventory-note" id="inv-hint">Selecciona objetos para el baúl. También puedes usar 🔗 Combinar para combinar dos objetos. Base 8 huecos · Riñoneras: ${pouches}/2 (+${pouches*2} espacios) · Máx 12.</p>`;
+ <div class="storage-footer"><span><b id="storage-selected-count">0</b> seleccionados</span><div>
+  ${stashBtn}
+  <button class="btn small ghost" onclick="clearStorageSelection();openInventory(false)">Limpiar</button>
+  <button class="btn small ghost" onclick="clearStorageSelection();document.querySelector('.modal-backdrop')?.remove()">Cerrar</button>
+ </div></div>
+ <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">
+  <button class="btn small" onclick="startCombineMode()">🔗 Combinar</button>
+  <button class="btn small" onclick="startReorderMode()">↕ Ordenar</button>
+  <button class="btn small ghost" onclick="cancelReorderMode()">Cancelar orden</button>
+ </div>
+ <p class="inventory-note" id="inv-hint">🔗 Combinar: toca dos plantas. ↕ Ordenar: toca objeto y luego la casilla destino. Base 8 · Riñoneras ${pouches}/2 · Máx 12.</p>`;
  openModal("INVENTARIO",body,"inv-modal");
 }
 window.startCombineMode=()=>{
+ window.__reorderMode=false; _reorderFrom=null;
  _combineSel=null;
- const hint=document.getElementById("inv-hint");
- if(hint)hint.textContent="Modo combinar: elige el PRIMER objeto (planta)...";
- toast("Elige el primer objeto para combinar");
  window.__combineMode=true;
+ clearStorageSelection();
+ const hint=document.getElementById("inv-hint");
+ if(hint)hint.textContent="Modo combinar: elige el PRIMER objeto (plantas / mezclas)...";
+ toast("Combinar: elige el primer objeto");
 };
 window.itemAction=(id,index,stash,action)=>{
  if(stash){
@@ -4740,7 +4893,18 @@ function renderGame(){
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S){openInventory()}});
 window.showCharacters=showCharacters;window.showDifficulty=showDifficulty;window.startGame=startGame;window.restartCurrentGame=restartCurrentGame;window.wipeAllSaves=wipeAllSaves;window.showContinue=showContinue;window.showHow=showHow;window.renderHome=renderHome;
-window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.toggleFullscreen=toggleFullscreen;window.enterFullscreen=enterFullscreen;window.exitFullscreen=exitFullscreen;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openDocument=openDocument;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=window.moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.ensureAudio=ensureAudio;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;window.storeFromInventory=storeFromInventory;window.takeFromStash=takeFromStash;window.takeAllFromStash=takeAllFromStash;
+window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.toggleFullscreen=toggleFullscreen;window.enterFullscreen=enterFullscreen;window.exitFullscreen=exitFullscreen;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openDocument=openDocument;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.ensureAudio=ensureAudio;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;
+window.toggleStorageSelection=toggleStorageSelection;
+window.clearStorageSelection=clearStorageSelection;
+window.storeSelectedFromInventory=storeSelectedFromInventory;
+window.storeFromInventory=storeFromInventory;
+window.takeSelectedFromStash=takeSelectedFromStash;
+window.takeFromStash=takeFromStash;
+window.takeAllFromStash=takeAllFromStash;
+window.startReorderMode=startReorderMode;
+window.cancelReorderMode=cancelReorderMode;
+window.moveInvSlot=moveInvSlot;
+window.storeFromInventory=storeFromInventory;window.takeFromStash=takeFromStash;window.takeAllFromStash=takeAllFromStash;
 applyMode();bindAudioUnlock();window.addEventListener("resize",()=>{if(PREFS.mode==="auto")applyMode()});setTimeout(()=>renderHome(),1500);
 
 // ---- PWA install ----
