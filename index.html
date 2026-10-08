@@ -339,6 +339,16 @@ html[data-mode="mobile"] .sidebar .panel-resources{display:none!important}
 html[data-mode="mobile"] .game{grid-template-columns:1fr}
 html[data-mode="mobile"] .scene-art{height:72px!important}
 
+
+.settings-menu{display:flex;flex-direction:column;gap:8px}
+.settings-nav{display:flex;flex-direction:column;gap:8px}
+.settings-nav-btn{width:100%;text-align:left;min-height:44px;justify-content:flex-start}
+.settings-back{margin-bottom:8px;width:auto}
+.settings-section-title{margin:0 0 10px;font:800 14px monospace;letter-spacing:.06em}
+.version-changes{margin:8px 0 0;padding-left:18px;color:#c8cdc9;font:13px/1.45 sans-serif}
+.version-changes li{margin-bottom:6px}
+.modal.settings-modal{width:min(440px,96vw);max-height:90vh;overflow:auto}
+
 </style>
 </head>
 <body>
@@ -355,6 +365,65 @@ html[data-mode="mobile"] .scene-art{height:72px!important}
 
 (() => {
 "use strict";
+
+const APP_VERSION = "1.7";
+/** Registro de versiones (máx. 5). La [0] es la actual; al publicar una nueva se inserta al inicio y se descarta la 5ª. */
+const VERSION_LOG = [
+ {
+  v:"1.7",
+  date:"2026-10-08",
+  title:"Ajustes por secciones",
+  changes:[
+   "Menú de Ajustes reorganizado: Sonido, Partida, Adaptabilidad, Versión, Reiniciar y Volver a la intro.",
+   "Exportar e importar partidas en archivo JSON.",
+   "Registro de versiones (últimas 5) con detalle de cambios.",
+   "Arma equipada: ya no se gasta munición si no hay arma equipada; botón Desequipar.",
+   "Confirmación al volver al menú de intro (el juego guarda automáticamente)."
+  ]
+ },
+ {
+  v:"1.6",
+  date:"2026-10-07",
+  title:"Inventario, baúl y ordenar",
+  changes:[
+   "Baúl y combinar: funciones exportadas correctamente (onclick).",
+   "Modo Ordenar: objeto → casilla destino, incluidas vacías.",
+   "Cierre del inventario (X) sin desordenar ni apilar modales.",
+   "Huecos vacíos respetados en el orden del inventario."
+  ]
+ },
+ {
+  v:"1.5",
+  date:"2026-10-07",
+  title:"Móvil, audio y combate",
+  changes:[
+   "HUD móvil: HP/Estrés/Ruido arriba; recursos bajo las elecciones.",
+   "Desbloqueo de audio al tocar (menos dependencia de Ajustes).",
+   "Menú de escape en combate con % de huida.",
+   "Retratos de personaje recentrados."
+  ]
+ },
+ {
+  v:"1.4",
+  date:"2026-10-06",
+  title:"PWA y misiones",
+  changes:[
+   "PWA instalable (manifest, service worker, iconos).",
+   "Panel de Misiones con estados y botón Ir.",
+   "Más ubicaciones y misiones para Adrian y Mara."
+  ]
+ },
+ {
+  v:"1.3",
+  date:"2026-10-06",
+  title:"Historia y zonas seguras",
+  changes:[
+   "Ampliación narrativa y rutas del distrito.",
+   "Guardado y baúl limitados a zonas seguras.",
+   "Cartuchos de tinta solo en difícil/realista."
+  ]
+ }
+];
 
 const DIFFS = {
  easy:{name:"Fácil",ammo:1.45,zombie:0.65,save:true,perm:false,desc:"Más munición y curación. Guardado ilimitado en zonas seguras. Los infectados hacen menos daño."},
@@ -605,7 +674,10 @@ function baseState(char,diff){
   inventoryMax:8,stash:[],
   ammo,
   // Documents are a separate permanent archive: they never consume inventory or stash slots.
-  docs:[],visited:[],flags:{flashCharges: char==="mara" ? 3 : 0},decisions:[],
+  docs:[],visited:[],flags:{
+   flashCharges: char==="mara" ? 3 : 0,
+   equipped: char==="adrian" ? "handgun" : null
+  },decisions:[],
   weapons,
   saves: needsInk ? 2 : 99,
   map:"barrio",room:"Calle Mercer",
@@ -3651,50 +3723,223 @@ function showContinue(){
  <button class="btn ghost" onclick="renderHome()">← Volver</button></section>`);
 }
 
-function settingsMarkup(){
- const mode=effectiveMode();
- return `<div class="settings-mobile-wrap">
- <div class="settings-grid settings-grid-vol">
-  <div class="settings-card settings-card-vol">
-   <div class="settings-icon">♫</div>
-   <div class="settings-labels"><b>Música</b><span>${PREFS.music}%</span></div>
-   <input data-pref="music" type="range" min="0" max="100" value="${PREFS.music}" oninput="setPref('music',this.value)">
-  </div>
-  <div class="settings-card settings-card-vol">
-   <div class="settings-icon">⚡</div>
-   <div class="settings-labels"><b>Efectos</b><span>${PREFS.sfx}%</span></div>
-   <input data-pref="sfx" type="range" min="0" max="100" value="${PREFS.sfx}" oninput="setPref('sfx',this.value)">
-  </div>
- </div>
- <div class="mode-box compact-mode">
-  <b>Interfaz</b>
-  <div class="mode-buttons">
-   <button class="btn ${PREFS.mode==='auto'?'primary':''}" onclick="setPref('mode','auto')">AUTO</button>
-   <button class="btn ${PREFS.mode==='mobile'?'primary':''}" onclick="setPref('mode','mobile')">MÓVIL</button>
-   <button class="btn ${PREFS.mode==='pc'?'primary':''}" onclick="setPref('mode','pc')">PC</button>
-  </div>
- </div>
- <div class="settings-actions">
-  <button class="btn ${PREFS.muted?'danger':'primary'}" onclick="setPref('muted',${!PREFS.muted})">${PREFS.muted?'🔇 OFF':'🔊 SONIDO'}</button>
-  <button class="btn ghost" onclick="getAudioCtx();resumeMusicFromGesture();uiSound('choice');setTimeout(()=>uiSound('shot'),120)">Probar</button>
- </div>
- <div class="settings-actions">
-  <button id="fullscreenBtn" class="btn primary" onclick="toggleFullscreen()">⛶ PANTALLA COMPLETA</button>
-  <button class="btn ghost" onclick="exitFullscreen()">▣ SALIR DE PANTALLA COMPLETA</button>
- </div>
- ${S?`<div class="settings-game">
-  <button class="btn danger" onclick="restartCurrentGame()">↺ Reiniciar</button>
-  <button class="btn ghost" onclick="if(confirm('¿Borrar TODOS los guardados?')){wipeAllSaves()}">Borrar guardados</button>
- </div>`:""}
- <p class="logline" style="text-align:center;margin:4px 0 0;opacity:.7">Raccoon Nightfall Files · v1.1</p>
- </div>`;
+function settingsMarkup(view){
+ if(view===undefined) view = window.__settingsView || "menu";
+ window.__settingsView = view;
+ const back = `<button class="btn ghost settings-back" onclick="settingsGo('menu')">← Ajustes</button>`;
+
+ if(view==="menu"){
+  return `<div class="settings-menu">
+   <p class="logline" style="margin:0 0 10px;text-align:center">Raccoon Nightfall Files · v${APP_VERSION}</p>
+   <div class="settings-nav">
+    <button class="btn settings-nav-btn" onclick="settingsGo('sound')">🔊 Sonido</button>
+    <button class="btn settings-nav-btn" onclick="settingsGo('save')">💾 Partida</button>
+    <button class="btn settings-nav-btn" onclick="settingsGo('adapt')">📱 Adaptabilidad</button>
+    <button class="btn settings-nav-btn" onclick="settingsGo('version')">📋 Versión</button>
+    <button class="btn settings-nav-btn" onclick="settingsGo('reset')">↺ Reiniciar</button>
+    <button class="btn settings-nav-btn danger" onclick="settingsGo('intro')">↩ Volver a la intro</button>
+   </div>
+  </div>`;
+ }
+
+ if(view==="sound"){
+  return `${back}
+  <div class="settings-mobile-wrap">
+   <h3 class="settings-section-title">Sonido</h3>
+   <div class="settings-grid settings-grid-vol">
+    <div class="settings-card settings-card-vol">
+     <div class="settings-icon">♫</div>
+     <div class="settings-labels"><b>Música</b><span id="lbl-music">${PREFS.music}%</span></div>
+     <input data-pref="music" type="range" min="0" max="100" value="${PREFS.music}" oninput="setPref('music',this.value);const l=document.getElementById('lbl-music');if(l)l.textContent=this.value+'%'">
+    </div>
+    <div class="settings-card settings-card-vol">
+     <div class="settings-icon">⚡</div>
+     <div class="settings-labels"><b>Efectos</b><span id="lbl-sfx">${PREFS.sfx}%</span></div>
+     <input data-pref="sfx" type="range" min="0" max="100" value="${PREFS.sfx}" oninput="setPref('sfx',this.value);const l=document.getElementById('lbl-sfx');if(l)l.textContent=this.value+'%'">
+    </div>
+   </div>
+   <div class="settings-actions" style="margin-top:10px">
+    <button class="btn ${PREFS.muted?'danger':'primary'}" onclick="setPref('muted',${!PREFS.muted});settingsGo('sound')">${PREFS.muted?'🔇 Sonido OFF':'🔊 Sonido ON'}</button>
+    <button class="btn ghost" onclick="getAudioCtx();resumeMusicFromGesture();uiSound('choice');setTimeout(()=>uiSound('shot'),120)">Probar efectos</button>
+   </div>
+  </div>`;
+ }
+
+ if(view==="save"){
+  const cur = S ? `${esc(CAMPAIGN[S.char].name)} · ${esc(DIFFS[S.diff].name)} · ${formatTime(S.playTime||0)}` : "Ninguna partida activa";
+  return `${back}
+  <div class="settings-mobile-wrap">
+   <h3 class="settings-section-title">Partida</h3>
+   <p class="inventory-note">Activa: <b>${cur}</b></p>
+   <p class="logline">Exporta un archivo JSON para respaldar o mover la partida a otro dispositivo. Importar sustituye el guardado de ese personaje/dificultad.</p>
+   <div class="settings-actions" style="flex-direction:column;gap:8px">
+    <button class="btn primary" onclick="exportSave()" ${S?"":"disabled"}>⬆ Exportar partida actual</button>
+    <button class="btn" onclick="exportAllSaves()">⬆ Exportar todos los guardados</button>
+    <label class="btn ghost" style="text-align:center;cursor:pointer">⬇ Importar partida
+     <input type="file" accept="application/json,.json" style="display:none" onchange="importSaveFile(this)">
+    </label>
+   </div>
+  </div>`;
+ }
+
+ if(view==="adapt"){
+  return `${back}
+  <div class="settings-mobile-wrap">
+   <h3 class="settings-section-title">Adaptabilidad</h3>
+   <div class="mode-box compact-mode">
+    <b>Modo de interfaz</b>
+    <div class="mode-buttons">
+     <button class="btn ${PREFS.mode==='auto'?'primary':''}" onclick="setPref('mode','auto');settingsGo('adapt')">AUTO</button>
+     <button class="btn ${PREFS.mode==='mobile'?'primary':''}" onclick="setPref('mode','mobile');settingsGo('adapt')">MÓVIL</button>
+     <button class="btn ${PREFS.mode==='pc'?'primary':''}" onclick="setPref('mode','pc');settingsGo('adapt')">PC</button>
+    </div>
+   </div>
+   <div class="settings-actions" style="margin-top:12px">
+    <button id="fullscreenBtn" class="btn primary" onclick="toggleFullscreen()">⛶ Pantalla completa</button>
+    <button class="btn ghost" onclick="exitFullscreen()">Salir de pantalla completa</button>
+   </div>
+   <p class="logline" style="margin-top:8px">AUTO elige móvil o PC según el ancho de la pantalla.</p>
+  </div>`;
+ }
+
+ if(view==="version"){
+  const list = VERSION_LOG.slice(0,5).map((e,i)=>`
+   <button class="btn settings-nav-btn ${i===0?'primary':''}" onclick="settingsGo('version-detail',${i})">
+    v${esc(e.v)}${i===0?" · actual":""} — ${esc(e.title)}
+   </button>`).join("");
+  return `${back}
+  <div class="settings-mobile-wrap">
+   <h3 class="settings-section-title">Versión</h3>
+   <p class="logline">Versión actual: <b>v${APP_VERSION}</b>. Pulsa una entrada para ver el detalle (se conservan las 5 últimas).</p>
+   <div class="settings-nav">${list}</div>
+  </div>`;
+ }
+
+ if(view==="version-detail"){
+  const idx = window.__settingsVersionIdx|0;
+  const e = VERSION_LOG[idx] || VERSION_LOG[0];
+  const items = (e.changes||[]).map(c=>`<li>${esc(c)}</li>`).join("");
+  return `${back}
+  <button class="btn ghost settings-back" onclick="settingsGo('version')">← Versiones</button>
+  <div class="settings-mobile-wrap">
+   <h3 class="settings-section-title">v${esc(e.v)} — ${esc(e.title)}</h3>
+   <p class="logline">${esc(e.date||"")}</p>
+   <ul class="version-changes">${items}</ul>
+  </div>`;
+ }
+
+ if(view==="reset"){
+  return `${back}
+  <div class="settings-mobile-wrap">
+   <h3 class="settings-section-title">Reiniciar</h3>
+   <p class="logline">Estas acciones no se pueden deshacer.</p>
+   <div class="settings-actions" style="flex-direction:column;gap:8px">
+    <button class="btn danger" onclick="restartCurrentGame()" ${S?"":"disabled"}>↺ Reiniciar partida actual</button>
+    <button class="btn ghost" onclick="if(confirm('¿Borrar TODOS los guardados de este navegador?')){wipeAllSaves()}">🗑 Borrar todos los guardados</button>
+   </div>
+   ${S?`<p class="inventory-note" style="margin-top:8px">Reiniciar borra el progreso de <b>${esc(CAMPAIGN[S.char].name)}</b> en <b>${esc(DIFFS[S.diff].name)}</b> y empieza de cero.</p>`:""}
+  </div>`;
+ }
+
+ if(view==="intro"){
+  return `${back}
+  <div class="settings-mobile-wrap">
+   <h3 class="settings-section-title">Volver a la intro</h3>
+   <div class="warning" style="margin:10px 0">El juego <b>guarda automáticamente</b> tu progreso. Si vuelves al menú de intro no perderás la partida: podrás continuar más tarde con CONTINUAR.</div>
+   <p class="logline">¿Salir al menú principal?</p>
+   <div class="settings-actions" style="flex-direction:column;gap:8px;margin-top:10px">
+    <button class="btn danger" onclick="confirmReturnToIntro()">↩ Volver al menú</button>
+    <button class="btn ghost" onclick="settingsGo('menu')">Cancelar</button>
+   </div>
+  </div>`;
+ }
+
+ return settingsMarkup("menu");
+}
+function settingsGo(view, versionIdx){
+ if(versionIdx!==undefined) window.__settingsVersionIdx = versionIdx;
+ window.__settingsView = view || "menu";
+ renderSettings();
+ uiSound("choice");
+}
+function confirmReturnToIntro(){
+ if(S){ try{ persist(); }catch(e){} }
+ document.querySelectorAll(".modal-backdrop").forEach(m=>m.remove());
+ window.__settingsView = "menu";
+ S=null;
+ stopMusic(false);
+ playMusic("intro");
+ renderHome();
+ toast("Progreso guardado · Menú principal");
+}
+function exportSave(){
+ if(!S){toast("No hay partida activa");return}
+ try{
+  const payload={ type:"rnf-save", appVersion:APP_VERSION, exportedAt:new Date().toISOString(), key:saveKey(), data:S };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`RNF_${S.char}_${S.diff}_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast("Partida exportada");
+ }catch(e){toast("No se pudo exportar");}
+}
+function exportAllSaves(){
+ try{
+  const saves={};
+  for(let i=0;i<localStorage.length;i++){
+   const k=localStorage.key(i);
+   if(k&&k.startsWith("rnf-save-")){
+    try{saves[k]=JSON.parse(localStorage.getItem(k))}catch(e){}
+   }
+  }
+  const payload={ type:"rnf-saves-all", appVersion:APP_VERSION, exportedAt:new Date().toISOString(), saves };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`RNF_all_saves_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast("Todos los guardados exportados");
+ }catch(e){toast("No se pudo exportar");}
+}
+function importSaveFile(input){
+ const file=input?.files?.[0];
+ if(!file)return;
+ const reader=new FileReader();
+ reader.onload=()=>{
+  try{
+   const payload=JSON.parse(reader.result);
+   if(payload.type==="rnf-save" && payload.data && payload.key){
+    localStorage.setItem(payload.key, JSON.stringify(payload.data));
+    toast("Partida importada · usa CONTINUAR");
+   }else if(payload.type==="rnf-saves-all" && payload.saves){
+    let n=0;
+    for(const [k,v] of Object.entries(payload.saves)){
+     if(k.startsWith("rnf-save-")){ localStorage.setItem(k, JSON.stringify(v)); n++; }
+    }
+    toast(`Importados ${n} guardados · usa CONTINUAR`);
+   }else if(payload.char && payload.diff){
+    // raw state object
+    const key=`rnf-save-${payload.char}-${payload.diff}`;
+    localStorage.setItem(key, JSON.stringify(payload));
+    toast("Partida importada · usa CONTINUAR");
+   }else{
+    toast("Archivo no reconocido");
+   }
+  }catch(e){toast("JSON inválido")}
+  input.value="";
+ };
+ reader.readAsText(file);
 }
 
 function restartCurrentGame(){
  if(!S)return;
- if(!confirm("¿Reiniciar esta partida desde el principio? Se perderá el progreso no guardado en otra dificultad."))return;
+ if(!confirm("¿Reiniciar esta partida desde el principio? Se perderá el progreso de este personaje y dificultad."))return;
  const char=S.char, diff=S.diff;
- document.querySelector(".modal-backdrop")?.remove();
+ document.querySelectorAll(".modal-backdrop").forEach(m=>m.remove());
+ window.__settingsView="menu";
  startGame(char,diff,true);
  toast("Partida reiniciada");
 }
@@ -3705,14 +3950,19 @@ function wipeAllSaves(){
   keys.forEach(k=>localStorage.removeItem(k));
  }catch(e){}
  toast("Guardados eliminados");
- renderSettings();
+ settingsGo("reset");
 }
 function renderSettings(){
+ const view = window.__settingsView || "menu";
  const old=document.querySelector(".settings-content");
- if(old)old.innerHTML=settingsMarkup();
- else openModal("AJUSTES",`<div class="settings-content">${settingsMarkup()}</div>`);
+ if(old) old.innerHTML=settingsMarkup(view);
+ else openModal("AJUSTES",`<div class="settings-content">${settingsMarkup(view)}</div>`,"settings-modal");
+ setTimeout(()=>{ try{ updateFullscreenButton(); }catch(e){} }, 0);
 }
-function openSettings(){renderSettings()}
+function openSettings(){
+ window.__settingsView = "menu";
+ renderSettings();
+}
 
 function isFullscreen(){
  return !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -3739,6 +3989,7 @@ async function exitFullscreen(){
 async function toggleFullscreen(){
  if(isFullscreen()) await exitFullscreen();
  else await enterFullscreen();
+ try{ updateFullscreenButton(); }catch(e){}
 }
 function updateFullscreenButton(){
  const b=document.getElementById('fullscreenBtn');
@@ -3774,7 +4025,10 @@ function addItem(ids){
   if(!ITEMS[id])continue;
   if(id==="ink" && DIFFS[S.diff].save!=="ink")continue;
   const it=ITEMS[id];
-  if(it.type==="weapon"){ S.flags.equipped = S.flags.equipped||id; if(S.weapons[id]) S.weapons[id].level=Math.max(1,S.weapons[id].level||0); }
+  if(it.type==="weapon"){
+   if(!S.flags.equipped) S.flags.equipped=id; // solo auto-equipa si no había arma
+   if(S.weapons[id]) S.weapons[id].level=Math.max(1,S.weapons[id].level||0);
+  }
   if(it.type==="ammo"){
    const max=it.stack||60;
    const cur=ammoCount(id);
@@ -4517,7 +4771,7 @@ window.itemAction=(id,index,stash,action)=>{
  if(it.type==="key"||it.type==="quest"){toast(`${it.name}: objeto de progreso. Se usa en la escena adecuada.`);return}
  toast(it.name);
 };
-window.equipItem=(id)=>{ window.itemAction(id, -1, false, "equip"); };
+window.equipItem=(id)=>{ setEquipped(id); };
 window.useInvItem=(id,index)=>{ window.itemAction(id, index, false, "use"); };
 
 
@@ -4740,10 +4994,21 @@ function startCombat(type,next){
  S.combat={type,next,enemy:clone(ENEMIES[type]),round:0,lastAim:null};
  S.stress=Math.min(100,S.stress+10);S.noise=0;renderGame();
 }
+function setEquipped(id){
+ if(id===null){
+  S.flags.equipped=null;
+  uiSound("choice"); toast("Arma desequipada");
+  persist(); renderGame(); return;
+ }
+ if(!hasItem(id) || ITEMS[id]?.type!=="weapon"){toast("No puedes equipar eso");return}
+ S.flags.equipped=id;
+ uiSound("choice"); toast("Equipada: "+ITEMS[id].name);
+ persist(); renderGame();
+}
 function combatShot(aim){
  const c=S.combat,e=c.enemy;
- const weapon=S.flags.equipped|| (hasItem("handgun")?"handgun":hasItem("shotgun")?"shotgun":hasItem("smg")?"smg":null);
- if(!weapon || !hasItem(weapon)){toast("No tienes un arma equipada");return}
+ const weapon=S.flags.equipped;
+ if(!weapon || !hasItem(weapon)){toast("Equipa un arma en EQUIPO para disparar");uiSound("error");return}
  const isShot=weapon==="shotgun";
  const isSmg=weapon==="smg";
  let ammoId=isShot?"shells":isSmg?"ammoSmg":"ammo9";
@@ -4809,13 +5074,13 @@ function combatUI(){
  const shells=ammoCount("shells");
  const ammoSmg=ammoCount("ammoSmg");
  const hasCam = hasItem("camera") && (S.flags.flashCharges||0)>0;
- const hasAnyWeapon = hasItem("handgun")||hasItem("shotgun")||hasItem("smg");
+ const equippedWeapon = (S.flags.equipped && hasItem(S.flags.equipped) && ITEMS[S.flags.equipped]?.type==="weapon") ? S.flags.equipped : null;
  return `<div class="combat">
  <div class="combat-card"><div class="combat-portrait">${esc(e.name.slice(0,2).toUpperCase())}</div>
  <div class="threat">${esc(e.name)}</div><div class="threatbar"><i style="width:${Math.max(0,e.hp/ENEMIES[c.type].hp*100)}%"></i></div>
  <p class="logline">${esc(e.desc)}</p><div class="combat-log">${(c.log||[]).map(x=>`<div class="${x[1]}">${esc(x[0])}</div>`).join("")||"<div>La criatura te ha localizado.</div>"}</div></div>
  <div class="combat-card"><div class="side-title">DECIDE BAJO PRESIÓN</div>
- ${hasAnyWeapon?`<div class="aim-grid"><button class="aim" onclick="combatShot('head')">CABEZA<br><small>alto daño / alto riesgo</small></button><button class="aim" onclick="combatShot('torso')">TORSO<br><small>estable</small></button><button class="aim" onclick="combatShot('legs')">PIERNAS<br><small>frena</small></button></div>`:`<p class="logline" style="color:var(--amber)">Sin arma de fuego. Usa flash o esquiva.</p>`}
+ ${equippedWeapon?`<p class="logline">Arma: ${esc(ITEMS[equippedWeapon].name)}</p><div class="aim-grid"><button class="aim" onclick="combatShot('head')">CABEZA<br><small>alto daño / alto riesgo</small></button><button class="aim" onclick="combatShot('torso')">TORSO<br><small>estable</small></button><button class="aim" onclick="combatShot('legs')">PIERNAS<br><small>frena</small></button></div>`:`<p class="logline" style="color:var(--amber)">Ningún arma equipada. Equípala en EQUIPO, o usa flash / esquiva.</p>`}
  <div class="combat-actions" style="margin-top:8px">
   ${hasCam?`<button class="btn primary" onclick="combatFlash()">📷 Flash (100% esquiva) · ${S.flags.flashCharges}</button>`:""}
   <button class="btn" onclick="combatDodge()">↝ Esquivar / reposicionarte</button>
@@ -4905,16 +5170,17 @@ function renderGame(){
  const needsInk = DIFFS[S.diff].save === "ink";
  const inkCount = (S.saves||0) + S.inventory.filter(x=>x==="ink").length;
  const hp=Math.max(0,S.hp), stress=S.stress;
- const eqId = S.flags.equipped || (hasItem("handgun")?"handgun":hasItem("shotgun")?"shotgun":hasItem("smg")?"smg":null);
- if(eqId && !hasItem(eqId)) S.flags.equipped = hasItem("handgun")?"handgun":hasItem("shotgun")?"shotgun":hasItem("smg")?"smg":null;
- const eqNow = S.flags.equipped && hasItem(S.flags.equipped) ? S.flags.equipped : null;
+ // Solo cuenta como equipada si está en inventario; nunca auto-equipar al renderizar
+ if(S.flags.equipped && !hasItem(S.flags.equipped)) S.flags.equipped=null;
+ const eqNow = (S.flags.equipped && hasItem(S.flags.equipped) && ITEMS[S.flags.equipped]?.type==="weapon") ? S.flags.equipped : null;
  const eqLabel = eqNow ? `${ITEMS[eqNow].ico} ${ITEMS[eqNow].name}` : "Ninguna";
  const equipBtns = (()=>{
   const btns=[];
   btns.push(`<div class="equip-current">Equipada: <span>${esc(eqLabel)}</span></div>`);
-  if(hasItem("handgun")) btns.push(`<button class="btn small ${eqNow==="handgun"?"primary":""}" onclick="S.flags.equipped='handgun';uiSound('choice');toast('Equipada: Pistola 9 mm');persist();renderGame()">🔫 Pistola${eqNow==="handgun"?" ✓":""}</button>`);
-  if(hasItem("shotgun")) btns.push(`<button class="btn small ${eqNow==="shotgun"?"primary":""}" onclick="S.flags.equipped='shotgun';uiSound('choice');toast('Equipada: Escopeta');persist();renderGame()">💥 Escopeta${eqNow==="shotgun"?" ✓":""}</button>`);
-  if(hasItem("smg")) btns.push(`<button class="btn small ${eqNow==="smg"?"primary":""}" onclick="S.flags.equipped='smg';uiSound('choice');toast('Equipada: SMG');persist();renderGame()">⚡ SMG${eqNow==="smg"?" ✓":""}</button>`);
+  if(hasItem("handgun")) btns.push(`<button class="btn small ${eqNow==="handgun"?"primary":"ghost"}" onclick="setEquipped('handgun')">🔫 Pistola${eqNow==="handgun"?" ✓":""}</button>`);
+  if(hasItem("shotgun")) btns.push(`<button class="btn small ${eqNow==="shotgun"?"primary":"ghost"}" onclick="setEquipped('shotgun')">💥 Escopeta${eqNow==="shotgun"?" ✓":""}</button>`);
+  if(hasItem("smg")) btns.push(`<button class="btn small ${eqNow==="smg"?"primary":"ghost"}" onclick="setEquipped('smg')">⚡ SMG${eqNow==="smg"?" ✓":""}</button>`);
+  if(eqNow) btns.push(`<button class="btn small ghost" onclick="setEquipped(null)">✖ Desequipar</button>`);
   if(hasItem("camera")) btns.push(`<button class="btn small" onclick="uiSound('choice');toast('Flash restantes: '+(S.flags.flashCharges||0))">📷 Cámara (${S.flags.flashCharges||0})</button>`);
   if(!hasItem("handgun")&&!hasItem("shotgun")&&!hasItem("smg")&&!hasItem("camera")) btns.push(`<span class="logline">Sin equipo</span>`);
   return btns.join("");
@@ -4955,7 +5221,7 @@ function renderGame(){
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S){openInventory()}});
 window.showCharacters=showCharacters;window.showDifficulty=showDifficulty;window.startGame=startGame;window.restartCurrentGame=restartCurrentGame;window.wipeAllSaves=wipeAllSaves;window.showContinue=showContinue;window.showHow=showHow;window.renderHome=renderHome;
-window.openSettings=openSettings;window.renderSettings=renderSettings;window.setPref=setPref;window.toggleFullscreen=toggleFullscreen;window.enterFullscreen=enterFullscreen;window.exitFullscreen=exitFullscreen;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openDocument=openDocument;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=moveInvSlot;window.equipItem=window.equipItem;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.ensureAudio=ensureAudio;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;
+window.openSettings=openSettings;window.importSaveFile=importSaveFile;window.exportAllSaves=exportAllSaves;window.exportSave=exportSave;window.confirmReturnToIntro=confirmReturnToIntro;window.settingsGo=settingsGo;window.renderSettings=renderSettings;window.setPref=setPref;window.toggleFullscreen=toggleFullscreen;window.enterFullscreen=enterFullscreen;window.exitFullscreen=exitFullscreen;window.processChoice=processChoice;window.openInventory=openInventory;window.openDocs=openDocs;window.openDocument=openDocument;window.openMap=openMap;window.openMissions=openMissions;window.openSafe=openSafe;window.saveAtType=saveAtType;window.combatShot=combatShot;window.combatDodge=combatDodge;window.combatBreathe=combatBreathe;window.combatFlash=combatFlash;window.openEscapeMenu=openEscapeMenu;window.attemptEscape=attemptEscape;window.uiSound=uiSound;window.toast=toast;window.moveInvSlot=moveInvSlot;window.equipItem=window.equipItem;window.setEquipped=setEquipped;window.useInvItem=window.useInvItem;window.playMusic=playMusic;window.stopMusic=stopMusic;window.resumeMusicFromGesture=resumeMusicFromGesture;window.ensureAudio=ensureAudio;window.getAudioCtx=getAudioCtx;window.itemAction=window.itemAction;window.startCombineMode=window.startCombineMode;
 window.toggleStorageSelection=toggleStorageSelection;
 window.clearStorageSelection=clearStorageSelection;
 window.storeSelectedFromInventory=storeSelectedFromInventory;
